@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket, RawData } from "ws";
 interface WSmessage {
     type: 'sender' | 'receiver' | 'createOffer' | 'createAnswer' | 'iceCandidate';
     candidate?: RTCIceCandidateInit;
+    sdp?: string;
 };
 
 const wss = new WebSocketServer({ port: 8080 });
@@ -29,13 +30,15 @@ wss.on('connection', (ws: WebSocket) => {
                     console.error('Only sender can create offer');
                     return;
                 }
-
+                recieverSocket?.send(JSON.stringify({ type: 'createOffer', sdp: message.sdp }));
                 break;
             case 'createAnswer':   // Forward answer SDP from receiver to sender
                 if (ws !== recieverSocket) {
                     console.error('Only receiver can create answer');
                     return;
                 }
+                senderSocket?.send(JSON.stringify({ type: 'createOffer', sdp: message.sdp }));
+                break;
             case 'iceCandidate':  // Forward ICE candidates between sender and receiver
                 if (ws == senderSocket) {
                     senderSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
