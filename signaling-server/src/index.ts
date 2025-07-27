@@ -37,14 +37,14 @@ wss.on('connection', (ws: WebSocket) => {
                     console.error('Only receiver can create answer');
                     return;
                 }
-                senderSocket?.send(JSON.stringify({ type: 'createOffer', sdp: message.sdp }));
+                senderSocket?.send(JSON.stringify({ type: 'createAnswer', sdp: message.sdp }));
                 break;
             case 'iceCandidate':  // Forward ICE candidates between sender and receiver
                 if (ws == senderSocket) {
-                    senderSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
+                    recieverSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
                 }
                 else if (ws == recieverSocket) {
-                    recieverSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
+                    senderSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
                 }
                 break;
             default:
