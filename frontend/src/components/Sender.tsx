@@ -52,7 +52,7 @@ export const Sender = () => {
 
         // This will be triggered by pc.addTrack()
         pc.onnegotiationneeded = async () => {
-            console.log("onnegotiationneeded triggered");
+            // console.log("onnegotiationneeded triggered");
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             socket.send(JSON.stringify({
@@ -75,7 +75,7 @@ export const Sender = () => {
     return (
         <div>
             <h1>Sender</h1>
-            <video ref={videoRef} muted autoPlay playsInline></video>
+            <video ref={videoRef}  autoPlay playsInline></video>
             <br />
             <button onClick={initiateConn}>Start Sending</button>
         </div>

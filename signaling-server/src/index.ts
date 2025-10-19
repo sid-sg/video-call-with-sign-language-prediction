@@ -1,5 +1,7 @@
 import { WebSocketServer, WebSocket, RawData } from "ws";
 
+const PORT = 8080;
+
 interface WSmessage {
     type: 'sender' | 'receiver' | 'createOffer' | 'createAnswer' | 'iceCandidate';
     candidate?: RTCIceCandidateInit;
@@ -7,9 +9,11 @@ interface WSmessage {
 };
 
 const wss = new WebSocketServer({ 
-    port: 8080,
-    host: '0.0.0.0'  
+    port: PORT,
+    // host: '0.0.0.0'  
 });
+
+console.log(`WebSocket signaling server running on port ${PORT}`);
 
 
 let senderSocket: null | WebSocket = null;
