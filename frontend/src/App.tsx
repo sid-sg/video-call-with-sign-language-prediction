@@ -5,8 +5,7 @@ const App = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/caller" element={<VideoCall />} />
-        <Route path="/callee" element={<VideoCall />} />
+        <Route path="/" element={<VideoCall />} />
       </Routes>
     </BrowserRouter>
   )
