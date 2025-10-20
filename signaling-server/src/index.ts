@@ -1,4 +1,5 @@
-import { WebSocketServer, WebSocket, RawData } from "ws";
+import { createServer } from "http";
+import { Server, Socket } from "socket.io";
 import { randomUUID } from "crypto";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
@@ -11,36 +12,31 @@ interface WSmessage {
     to?: string;
 };
 
-const wss = new WebSocketServer({
-    port: PORT,
+const httpServer = createServer();
+const io = new Server(httpServer, {
+    cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-console.log(`WebSocket signaling server running on port ${PORT}`);
+const clients = new Map<string, string>(); // Map of client IDs to WebSocket connections
 
-const clients = new Map<string, WebSocket>(); // Map of client IDs to WebSocket connections
-
-// helper function to send data to a specific client
-const sendToClient = (targetId: string, data: any) => {
-    const target = clients.get(targetId);
-    if (target && target.readyState === WebSocket.OPEN) {
-        target.send(JSON.stringify(data));
-    }
-};
-
-wss.on('connection', (ws: WebSocket) => {
+io.on('connection', (socket: Socket) => {
     const userID = randomUUID();
-    clients.set(userID, ws);
-    ws.send(JSON.stringify({ type: "joined", id: userID }));
+    clients.set(userID, socket.id);
 
-    ws.on("message", (raw: RawData) => {
-        const message: WSmessage = JSON.parse(raw.toString());
+    socket.emit('joined', { type: "joined", id: userID });
+    console.log(`Client connected: ${userID}`);
+
+    socket.on("message", (message: WSmessage) => {
 
         switch (message.type) {
             case "offer":
             case "answer":
             case "iceCandidate":
                 if (message.to) {
-                    sendToClient(message.to, { ...message, from: userID });
+                    const targetSocketId = clients.get(message.to);
+                    if (targetSocketId) {
+                        io.to(targetSocketId).emit('message', { ...message, from: userID });
+                    }
                 }
                 break;
             default:
@@ -49,7 +45,7 @@ wss.on('connection', (ws: WebSocket) => {
 
     });
 
-    ws.on("close", () => {
+    socket.on("disconnect", () => {
         if (userID) {
             clients.delete(userID);
             console.log(`Client disconnected: ${userID}`);
@@ -57,9 +53,13 @@ wss.on('connection', (ws: WebSocket) => {
         }
     });
 
-    ws.on("error", (err) => {
-        console.log(`WebSocket error for client ${userID}:`, err);
+    socket.on("error", (err) => {
+        console.log(`Socket error for client ${userID}:`, err);
 
     });
 
+});
+
+httpServer.listen(PORT, () => {
+    console.log(`Socket.IO signaling server running on port ${PORT}`);
 });
