@@ -1,13 +1,12 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom"
-import { Receiver } from "./components/Receiver"
-import { Sender } from "./components/Sender"
+import { VideoCall } from "./components/VideoCall"
 
 const App = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/sender" element={<Sender />} />
-        <Route path="/receiver" element={<Receiver />} />
+        <Route path="/caller" element={<VideoCall />} />
+        <Route path="/callee" element={<VideoCall />} />
       </Routes>
     </BrowserRouter>
   )
