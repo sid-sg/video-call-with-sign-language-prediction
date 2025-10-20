@@ -18,7 +18,7 @@ export const VideoCall = () => {
 
     // ---------------- Signaling Server Socket.IO Setup ----------------
     useEffect(() => {
-        const socketConnection = io('http://localhost:8080');
+        const socketConnection = io('https://webrtc-video-calling-demo.onrender.com/');
         
         socketConnection.on('connect', () => {
             console.log("Connected to signaling server");
