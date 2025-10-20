@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket, RawData } from "ws";
 import { randomUUID } from "crypto";
 
-const PORT = 8080;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 
 interface WSmessage {
     type: 'join' | 'offer' | 'answer' | 'iceCandidate';
