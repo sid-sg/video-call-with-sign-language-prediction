@@ -1,232 +1,116 @@
-import { useEffect, useState, useRef } from "react";
-import { io, Socket } from "socket.io-client";
+import { useSocket } from '../hooks/useSocket';
+import { useTurnServers } from '../hooks/useTurnServers';
+import { useMediaStream } from '../hooks/useMediaStream';
+import { useWebRTC } from '../hooks/useWebRTC';
+// import { useChat } from '../hooks/useChat';
+import { VideoPlayer } from './VideoPlayer';
+// import { MediaControls } from './MediaControls';
+// import { ChatPanel } from './ChatPanel';
+
 
 export const VideoCall = () => {
-    // Socket.IO connection state
-    const [socket, setSocket] = useState<Socket | null>(null);
+    const { socket, userId, isConnected: socketConnected } = useSocket();
+    const { turnServers, isLoadingTurn } = useTurnServers();
+    const { localStream, localVideoRef, mediaControls } = useMediaStream();
 
-    // TURN Servers states
-    const [turnServers, setTurnServers] = useState<RTCIceServer[]>([]);
-    const [isLoadingTurn, setIsLoadingTurn] = useState(true);
-
-    //Refs for displaying local and remote video streams
-    const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
-
-    // RTCPeerConnection reference
-    const pcRef = useRef<RTCPeerConnection | null>(null);
-
-    const [userId, setUserId] = useState<string | null>(null);
-    const [targetId, setTargetId] = useState<string | null>(null);
-
-
-    // ---------------- Signaling Server Socket.IO Setup ----------------
-    useEffect(() => {
-        const socketConnection = io('https://webrtc-video-calling-demo.onrender.com/');
-
-        socketConnection.on('connect', () => {
-            console.log("Connected to signaling server");
+    const { remoteVideoRef, targetId, setTargetId, callPeer, isConnected: peerConnected } =
+        useWebRTC({
+            socket, userId, turnServers, localStream, isLoadingTurn,
         });
 
-        socketConnection.on('disconnect', () => {
-            console.log("Disconnected from signaling server");
-        });
-
-        setSocket(socketConnection);
-
-        return () => {
-            socketConnection.close();
-        };
-    }, []);
-
-    // ---------------- Fetch TURN Server credentials ----------------
-    useEffect(() => {
-        const fetchTurnCredentials = async () => {
-            try {
-                const response = await fetch('https://webrtc-video-calling-demo.onrender.com/api/turn-credentials');
-                const data = await response.json();
-
-                if (data.iceServers && Array.isArray(data.iceServers)) {
-                    setTurnServers(data.iceServers);
-                    console.log('TURN servers loaded:', data.iceServers);
-                }
-            } catch (error) {
-                console.error('Error fetching TURN credentials:', error);
-                setTurnServers([{ urls: 'stun:stun.l.google.com:19302' }]);
-            } finally {
-                setIsLoadingTurn(false);
-            }
-
-        };
-
-        fetchTurnCredentials();
-    }, []);
-
-    // ---------------- WebRTC Setup ----------------
-    useEffect(() => {
-        if (!socket || isLoadingTurn) return;
-
-
-        const config: RTCConfiguration = {
-            iceServers: turnServers.length > 0 ? turnServers : [{ urls: 'stun:stun.l.google.com:19302' }],
-            bundlePolicy: 'max-bundle'
-        };
-
-        const pc = new RTCPeerConnection(config);
-        pcRef.current = pc;
-
-        // On recieving a track, set it to the remote video element
-        pc.ontrack = (event) => {
-            if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = event.streams[0];
-            }
-        };
-
-        // on getting new ICE candidate, send it to the peer via signaling server
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('message', {
-                    type: 'iceCandidate',
-                    candidate: event.candidate,
-                    from: userId,
-                    to: targetId
-                });
-            }
-        };
-
-        // ---------------- Signaling Message Handling ----------------
-
-        socket.on('joined', (message) => {
-            setUserId(message.id);
-            console.log('Received user ID:', message.id);
-        });
-
-        socket.on('message', async (message) => {
-            // If we are the callee and receive an offer → create & send back an answer
-            if (message.type === 'offer') {
-                await pc.setRemoteDescription(message.sdp);
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-
-                socket.emit('message', {
-                    type: 'answer',
-                    sdp: pc.localDescription,
-                    from: userId,
-                    to: message.from
-                });
-            }
-
-            // If we are the caller and receive an answer → set it as remote description
-            else if (message.type === 'answer') {
-                await pc.setRemoteDescription(message.sdp);
-            }
-
-            // If we receive a new ICE candidate → add it to our peer connection
-            else if (message.type === 'iceCandidate') {
-                await pc.addIceCandidate(message.candidate);
-            }
-        });
-
-        // ---------------- Local Media Capturing ----------------
-
-        const startLocalMedia = async () => {
-            try {
-                const localStream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true
-                });
-
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = localStream;
-                }
-
-                // add all tracks (video + audio) to the peer connection
-                localStream.getTracks().forEach(
-                    (track) => pc.addTrack(track, localStream)
-                );
-            } catch (error) {
-                console.error('Error accessing media devices:', error);
-            }
-        };
-
-        startLocalMedia();
-
-        // Cleanup listeners on unmount
-        return () => {
-            socket.off('joined');
-            socket.off('message');
-        };
-
-    }, [socket, userId, targetId, isLoadingTurn, turnServers]);
-
-
-    // ---------------- Create Offer ----------------
-    const callPeer = async () => {
-        if (!pcRef.current || !socket || !userId || !targetId) return;
-        const pc = pcRef.current;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('message', {
-            type: "offer",
-            sdp: pc.localDescription,
-            from: userId,
-            to: targetId,
-        });
-    };
 
 
     return (
-        <div className="flex flex-col items-center gap-4 p-8">
-            <h2 className="text-2xl font-bold mb-4">WebRTC Video Call</h2>
+        <div className="min-h-screen bg-gray-50 p-8">
+            <div className="max-w-7xl mx-auto">
+                <h2 className="text-3xl font-bold mb-8 text-center">WebRTC Video Call</h2>
 
-            <div className="flex gap-4">
-                <div>
-                    <h3 className="text-lg font-semibold mb-2">🟢 Local Video</h3>
-                    <video
-                        ref={localVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-80 border border-gray-300 rounded bg-black"
-                    />
-                </div>
-                <div>
-                    <h3 className="text-lg font-semibold mb-2">🔵 Remote Video</h3>
-                    <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="w-80 border border-gray-300 rounded bg-black"
-                    />
-                </div>
-            </div>
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Video Section */}
+                    <div className="flex-1">
+                        <div className="flex flex-col gap-6">
+                            {/* Videos */}
+                            <div className="flex flex-wrap gap-4 justify-center">
+                                <VideoPlayer
+                                    videoRef={localVideoRef}
+                                    label="🟢 Local Video"
+                                    muted
+                                    isVideoEnabled={mediaControls.video}
+                                />
+                                <VideoPlayer
+                                    videoRef={remoteVideoRef}
+                                    label="🔵 Remote Video"
+                                />
+                            </div>
 
-            <div className="mt-4 flex items-center gap-2">
-                <input
-                    placeholder="Enter Peer ID"
-                    value={targetId || ""}
-                    onChange={(e) => setTargetId(e.target.value)}
-                    className="border border-gray-300 px-3 py-2 rounded"
+                            {/* Media Controls */}
+                            {/* <div className="flex justify-center">
+                <MediaControls
+                  controls={mediaControls}
+                  onToggleVideo={toggleVideo}
+                  onToggleAudio={toggleAudio}
                 />
-                <button
-                    onClick={callPeer}
-                    disabled={!targetId || !socket || isLoadingTurn}
-                    className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600"
-                >
-                    Call Peer
-                </button>
-            </div>
+              </div> */}
 
-            {userId && (
-                <div className="mt-2 p-3 bg-gray-100 rounded">
-                    <p className="text-sm text-gray-700">
-                        Your ID: <b className="font-mono">{userId}</b>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Share this ID with someone to receive a call
-                    </p>
+                            {/* Call Controls */}
+                            <div className="flex flex-col items-center gap-4 bg-white p-6 rounded-lg shadow">
+                                <div className="flex items-center gap-2 w-full max-w-md">
+                                    <input
+                                        placeholder="Enter Peer ID"
+                                        value={targetId || ''}
+                                        onChange={(e) => setTargetId(e.target.value)}
+                                        className="flex-1 border border-gray-300 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button
+                                        onClick={callPeer}
+                                        disabled={!targetId || !socket || isLoadingTurn}
+                                        className="bg-blue-500 text-white px-6 py-2 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors font-semibold"
+                                    >
+                                        Call
+                                    </button>
+                                </div>
+
+                                {userId && (
+                                    <div className="w-full max-w-md p-4 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-700">
+                                            Your ID: <span className="font-mono font-bold">{userId}</span>
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Share this ID to receive calls
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Connection Status */}
+                                <div className="flex gap-4 text-sm">
+                                    <span className={`flex items-center gap-2 ${socketConnected ? 'text-green-600' : 'text-red-600'}`}>
+                                        <span className="w-2 h-2 rounded-full bg-current"></span>
+                                        {socketConnected ? 'Connected' : 'Disconnected'}
+                                    </span>
+                                    {peerConnected && (
+                                        <span className="flex items-center gap-2 text-green-600">
+                                            <span className="w-2 h-2 rounded-full bg-current"></span>
+                                            Peer Connected
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Chat Section */}
+                    {/* <div className="lg:w-auto"> */}
+                    {/* <ChatPanel
+              messages={messages}
+              inputMessage={inputMessage}
+              onInputChange={setInputMessage}
+              onSendMessage={sendMessage}
+              userId={userId}
+            /> */}
+                    {/* </div> */}
                 </div>
-            )}
+            </div>
         </div>
+
     );
 };
