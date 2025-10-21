@@ -5,6 +5,10 @@ export const VideoCall = () => {
     // Socket.IO connection state
     const [socket, setSocket] = useState<Socket | null>(null);
 
+    // TURN Servers states
+    const [turnServers, setTurnServers] = useState<RTCIceServer[]>([]);
+    const [isLoadingTurn, setIsLoadingTurn] = useState(true);
+
     //Refs for displaying local and remote video streams
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -19,7 +23,7 @@ export const VideoCall = () => {
     // ---------------- Signaling Server Socket.IO Setup ----------------
     useEffect(() => {
         const socketConnection = io('https://webrtc-video-calling-demo.onrender.com/');
-        
+
         socketConnection.on('connect', () => {
             console.log("Connected to signaling server");
         });
@@ -35,11 +39,39 @@ export const VideoCall = () => {
         };
     }, []);
 
+    // ---------------- Fetch TURN Server credentials ----------------
+    useEffect(() => {
+        const fetchTurnCredentials = async () => {
+            try {
+                const response = await fetch('https://webrtc-video-calling-demo.onrender.com/api/turn-credentials');
+                const data = await response.json();
+
+                if (data.iceServers && Array.isArray(data.iceServers)) {
+                    setTurnServers(data.iceServers);
+                    console.log('TURN servers loaded:', data.iceServers);
+                }
+            } catch (error) {
+                console.error('Error fetching TURN credentials:', error);
+                setTurnServers([{ urls: 'stun:stun.l.google.com:19302' }]);
+            } finally {
+                setIsLoadingTurn(false);
+            }
+
+        };
+
+        fetchTurnCredentials();
+    }, []);
+
     // ---------------- WebRTC Setup ----------------
     useEffect(() => {
         if (!socket) return;
 
-        const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const config: RTCConfiguration = {
+            iceServers: turnServers.length > 0
+                ? turnServers
+                : [{ urls: 'stun:stun.l.google.com:19302' }]
+        };
+
         const pc = new RTCPeerConnection(config);
         pcRef.current = pc;
 
@@ -146,7 +178,7 @@ export const VideoCall = () => {
     return (
         <div className="flex flex-col items-center gap-4 p-8">
             <h2 className="text-2xl font-bold mb-4">WebRTC Video Call</h2>
-            
+
             <div className="flex gap-4">
                 <div>
                     <h3 className="text-lg font-semibold mb-2">🟢 Local Video</h3>
