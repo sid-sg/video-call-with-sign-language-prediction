@@ -68,9 +68,8 @@ export const VideoCall = () => {
 
 
         const config: RTCConfiguration = {
-            iceServers: turnServers.length > 0
-                ? turnServers
-                : [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: turnServers.length > 0 ? turnServers : [{ urls: 'stun:stun.l.google.com:19302' }],
+            bundlePolicy: 'max-bundle'
         };
 
         const pc = new RTCPeerConnection(config);
