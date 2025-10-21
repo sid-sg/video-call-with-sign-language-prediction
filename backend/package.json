@@ -16,6 +16,7 @@
     "@types/node": "^24.9.0",
     "@types/ws": "^8.18.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "socket.io": "^4.8.1",
     "typescript": "^5.0.0",

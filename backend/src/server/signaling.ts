@@ -5,7 +5,7 @@ import { WSmessage } from "../types/message.js";
 
 export function initSignaling(io: Server) {
 
-    const clients = new Map<string, string>(); // Map of client IDs to WebSocket connections
+    const clients = new Map<string, string>(); // Map of client IDs to socket connections
 
     io.on('connection', (socket: Socket) => {
         const userID = randomUUID();
@@ -48,13 +48,3 @@ export function initSignaling(io: Server) {
 
     });
 }
-
-// const httpServer = createServer();
-// const io = new Server(httpServer, {
-//     cors: { origin: "*", methods: ["GET", "POST"] },
-// });
-
-
-// httpServer.listen(PORT, () => {
-//     console.log(`Socket.IO signaling server running on port ${PORT}`);
-// });

@@ -5,7 +5,7 @@ import cors from "cors";
 
 import { CONFIG } from "../config/env";
 import { initSignaling } from "./signaling";
-// import turnRouter from "./routes/turn.js";
+import turnRouter from "./routes/turn";
 import healthRouter from "./routes/health";
 
 const app = express();
@@ -14,7 +14,7 @@ app.use(express.json());
 
 // REST routes
 app.use("/health", healthRouter);
-// app.use("/api", turnRouter);
+app.use("/api", turnRouter);
 
 const httpServer = createServer(app);
 
