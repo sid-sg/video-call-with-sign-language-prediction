@@ -64,7 +64,8 @@ export const VideoCall = () => {
 
     // ---------------- WebRTC Setup ----------------
     useEffect(() => {
-        if (!socket) return;
+        if (!socket || isLoadingTurn) return;
+
 
         const config: RTCConfiguration = {
             iceServers: turnServers.length > 0
@@ -157,7 +158,7 @@ export const VideoCall = () => {
             socket.off('message');
         };
 
-    }, [socket, userId, targetId]);
+    }, [socket, userId, targetId, isLoadingTurn, turnServers]);
 
 
     // ---------------- Create Offer ----------------
@@ -210,7 +211,7 @@ export const VideoCall = () => {
                 />
                 <button
                     onClick={callPeer}
-                    disabled={!targetId || !socket}
+                    disabled={!targetId || !socket || isLoadingTurn}
                     className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600"
                 >
                     Call Peer
