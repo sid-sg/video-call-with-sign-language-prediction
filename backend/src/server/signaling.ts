@@ -27,6 +27,24 @@ export function initSignaling(io: Server) {
                         }
                     }
                     break;
+                case "chat":
+                    if (message.to) {
+                        const targetSocketId = clients.get(message.to);
+                        if (targetSocketId) {
+                            io.to(targetSocketId).emit('message', {
+                                type: 'chat',
+                                message: message.message,
+                                from: userID,
+                                to: message.to,
+                                timestamp: message.timestamp || Date.now()
+                            });
+                            // console.log(`Chat message from ${userID} to ${message.to}`);
+                        } else {
+                            console.warn(`Target user ${message.to} not found`);
+                        }
+                    }
+                    break;
+
                 default:
                     console.warn("Unknown message type:", message.type);
             }
