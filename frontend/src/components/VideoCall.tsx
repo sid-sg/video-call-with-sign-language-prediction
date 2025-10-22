@@ -2,10 +2,10 @@ import { useSocket } from '../hooks/useSocket';
 import { useTurnServers } from '../hooks/useTurnServers';
 import { useMediaStream } from '../hooks/useMediaStream';
 import { useWebRTC } from '../hooks/useWebRTC';
-// import { useChat } from '../hooks/useChat';
 import { VideoPlayer } from './VideoPlayer';
 import { MediaControls } from './MediaControls';
-// import { ChatPanel } from './ChatPanel';
+import { useDataChannel } from '../hooks/useDataChannel';
+import { ChatPanel } from './ChatPanel';
 
 
 export const VideoCall = () => {
@@ -13,11 +13,11 @@ export const VideoCall = () => {
     const { turnServers, isLoadingTurn } = useTurnServers();
     const { localStream, localVideoRef, mediaControls, toggleVideo, toggleAudio } = useMediaStream();
 
-    const { remoteVideoRef, targetId, setTargetId, callPeer, isConnected: peerConnected } =
+    const { peerConnection, remoteVideoRef, targetId, setTargetId, callPeer, isConnected: peerConnected, isInitiator } =
         useWebRTC({
             socket, userId, turnServers, localStream, isLoadingTurn,
         });
-
+    const { messages, sendMessage, isChannelOpen } = useDataChannel({ peerConnection, userId, isInitiator });
 
 
     return (
@@ -101,15 +101,14 @@ export const VideoCall = () => {
                     </div>
 
                     {/* Chat Section */}
-                    {/* <div className="lg:w-auto"> */}
-                    {/* <ChatPanel
-              messages={messages}
-              inputMessage={inputMessage}
-              onInputChange={setInputMessage}
-              onSendMessage={sendMessage}
-              userId={userId}
-            /> */}
-                    {/* </div> */}
+                    <div className="lg:w-auto">
+                        <ChatPanel
+                            messages={messages}
+                            onSendMessage={sendMessage}
+                            isChannelOpen={isChannelOpen}
+                        />
+                    </div>
+
                 </div>
             </div>
         </div>

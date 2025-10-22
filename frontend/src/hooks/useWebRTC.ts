@@ -15,6 +15,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const [targetId, setTargetId] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [isInitiator, setIsInitiator] = useState(false);
 
 
     useEffect(() => {
@@ -63,6 +64,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
         const handleMessage = async (message: SignalingMessage) => {
             // If we are the callee and receive an offer → create & send back an answer
             if (message.type === 'offer') {
+                setIsInitiator(false); // We are the answerer
                 await pc.setRemoteDescription(message.sdp!);
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
@@ -99,6 +101,8 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const callPeer = async () => {
         if (!pcRef.current || !socket || !userId || !targetId) return;
 
+        setIsInitiator(true); // We are the caller
+
         const pc = pcRef.current;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -112,11 +116,13 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     };
 
     return {
+        peerConnection: pcRef.current,
         remoteVideoRef,
         targetId,
         setTargetId,
         callPeer,
         isConnected,
+        isInitiator,
     };
 
 };

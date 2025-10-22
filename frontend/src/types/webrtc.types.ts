@@ -12,3 +12,11 @@ export interface MediaControls {
     video: boolean;
     audio: boolean;
 }
+
+export interface ChatMessage {
+    id: string;
+    text: string;
+    senderId: string;
+    timestamp: number;
+    isOwn: boolean;
+}
