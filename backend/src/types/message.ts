@@ -1,9 +1,7 @@
 export interface WSmessage {
-  type: "join" | "offer" | "answer" | "iceCandidate" | "chat";
+  type: "join" | "offer" | "answer" | "iceCandidate";
   candidate?: RTCIceCandidateInit;
   sdp?: string;
   from?: string;
   to?: string;
-  message?: string;
-  timestamp?: number;
 }
