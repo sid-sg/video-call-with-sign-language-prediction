@@ -12,6 +12,7 @@ interface UseWebRTCProps {
 
 export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingTurn }: UseWebRTCProps) => {
     const pcRef = useRef<RTCPeerConnection | null>(null); // RTCPeerConnection reference
+    const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const [targetId, setTargetId] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
@@ -28,6 +29,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
 
         const pc = new RTCPeerConnection(config);
         pcRef.current = pc;
+        setPeerConnection(pc);
 
         // Add local tracks to peer connection
         localStream.getTracks().forEach(track => {
@@ -92,11 +94,13 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
 
         // Cleanup listeners on unmount
         return () => {
-            socket.off('joined');
-            socket.off('message');
+            socket.off('message', handleMessage);
+            pc.close();
+            setPeerConnection(null);
         };
 
-    }, [socket, userId, targetId, isLoadingTurn, turnServers]);
+
+    }, [socket, userId, targetId, isLoadingTurn, turnServers, localStream]);
 
     const callPeer = async () => {
         if (!pcRef.current || !socket || !userId || !targetId) return;
@@ -116,7 +120,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     };
 
     return {
-        peerConnection: pcRef.current,
+        peerConnection,
         remoteVideoRef,
         targetId,
         setTargetId,
