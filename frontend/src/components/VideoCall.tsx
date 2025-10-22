@@ -4,14 +4,14 @@ import { useMediaStream } from '../hooks/useMediaStream';
 import { useWebRTC } from '../hooks/useWebRTC';
 // import { useChat } from '../hooks/useChat';
 import { VideoPlayer } from './VideoPlayer';
-// import { MediaControls } from './MediaControls';
+import { MediaControls } from './MediaControls';
 // import { ChatPanel } from './ChatPanel';
 
 
 export const VideoCall = () => {
     const { socket, userId, isConnected: socketConnected } = useSocket();
     const { turnServers, isLoadingTurn } = useTurnServers();
-    const { localStream, localVideoRef, mediaControls } = useMediaStream();
+    const { localStream, localVideoRef, mediaControls, toggleVideo, toggleAudio } = useMediaStream();
 
     const { remoteVideoRef, targetId, setTargetId, callPeer, isConnected: peerConnected } =
         useWebRTC({
@@ -44,13 +44,13 @@ export const VideoCall = () => {
                             </div>
 
                             {/* Media Controls */}
-                            {/* <div className="flex justify-center">
-                <MediaControls
-                  controls={mediaControls}
-                  onToggleVideo={toggleVideo}
-                  onToggleAudio={toggleAudio}
-                />
-              </div> */}
+                            <div className="flex justify-center">
+                                <MediaControls
+                                    controls={mediaControls}
+                                    onToggleVideo={toggleVideo}
+                                    onToggleAudio={toggleAudio}
+                                />
+                            </div>
 
                             {/* Call Controls */}
                             <div className="flex flex-col items-center gap-4 bg-white p-6 rounded-lg shadow">
