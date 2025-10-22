@@ -36,10 +36,12 @@ export const VideoCall = () => {
                                     label="🟢 Local Video"
                                     muted
                                     isVideoEnabled={mediaControls.video}
+                                    isLocal={true}
                                 />
                                 <VideoPlayer
                                     videoRef={remoteVideoRef}
                                     label="🔵 Remote Video"
+                                    isLocal={false}
                                 />
                             </div>
 
