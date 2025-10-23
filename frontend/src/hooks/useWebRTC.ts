@@ -67,6 +67,11 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
         const handleMessage = async (message: SignalingMessage) => {
             // If we are the callee and receive an offer → create & send back an answer
             if (message.type === 'offer') {
+                if (pc.signalingState !== "stable") {
+                    console.warn("Skipping offer because signalingState=", pc.signalingState);
+                    return;
+                }
+
                 setIsInitiator(false); // We are the answerer
                 await pc.setRemoteDescription(message.sdp!);
                 const answer = await pc.createAnswer();
@@ -82,6 +87,11 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
 
             // If we are the caller and receive an answer → set it as remote description
             else if (message.type === 'answer') {
+                if (pc.signalingState !== "have-local-offer") {
+                    console.warn("Skipping answer because signalingState=", pc.signalingState);
+                    return;
+                }
+
                 await pc.setRemoteDescription(message.sdp!);
             }
 
