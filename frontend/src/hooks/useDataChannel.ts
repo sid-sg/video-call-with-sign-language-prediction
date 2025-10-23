@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ChatMessage } from '../types/webrtc.types';
 
 interface UseDataChannelProps {
@@ -7,40 +7,18 @@ interface UseDataChannelProps {
     isInitiator: boolean;
 }
 
-export const useDataChannel = ({ peerConnection, userId, isInitiator }: UseDataChannelProps) => {
+export const useDataChannel = ({
+    peerConnection,
+    userId,
+    isInitiator
+}: UseDataChannelProps) => {
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isChannelOpen, setIsChannelOpen] = useState(false);
+    const dataChannelRef = useRef<RTCDataChannel | null>(null);
 
     useEffect(() => {
         if (!peerConnection) return;
-
-        let channel: RTCDataChannel;
-
-        if (isInitiator) {
-            // Caller creates the data channel
-            channel = peerConnection.createDataChannel('chat', {
-                ordered: true,
-            });
-            console.log('Data channel created by initiator');
-        } else {
-            // Callee receives the data channel
-            const handleDataChannel = (event: RTCDataChannelEvent) => {
-                channel = event.channel;
-                console.log('Data channel received by answerer');
-                setupDataChannel(channel);
-            };
-
-            peerConnection.addEventListener('datachannel', handleDataChannel);
-
-            return () => {
-                peerConnection.removeEventListener('datachannel', handleDataChannel);
-            };
-        }
-
-        if (isInitiator) {
-            setupDataChannel(channel);
-        }
 
         function setupDataChannel(dc: RTCDataChannel) {
             dc.onopen = () => {
@@ -73,19 +51,46 @@ export const useDataChannel = ({ peerConnection, userId, isInitiator }: UseDataC
                 }
             };
 
+            dataChannelRef.current = dc;
             setDataChannel(dc);
         }
 
+        if (isInitiator) {
+            // Caller creates the data channel IMMEDIATELY
+            console.log('Creating data channel as initiator');
+            const channel = peerConnection.createDataChannel('chat', {
+                ordered: true,
+            });
+            setupDataChannel(channel);
+        } else {
+            // Callee waits for the data channel
+            console.log('Waiting for data channel as answerer');
+            const handleDataChannel = (event: RTCDataChannelEvent) => {
+                console.log('Data channel received by answerer');
+                setupDataChannel(event.channel);
+            };
+
+            peerConnection.addEventListener('datachannel', handleDataChannel);
+
+            return () => {
+                peerConnection.removeEventListener('datachannel', handleDataChannel);
+            };
+        }
+
         return () => {
-            if (channel && channel.readyState === 'open') {
-                channel.close();
+            if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
+                dataChannelRef.current.close();
             }
         };
     }, [peerConnection, isInitiator]);
 
     const sendMessage = useCallback((text: string) => {
         if (!dataChannel || dataChannel.readyState !== 'open' || !userId) {
-            console.warn('Data channel not ready or userId not set');
+            console.warn('Data channel not ready or userId not set', {
+                hasChannel: !!dataChannel,
+                state: dataChannel?.readyState,
+                hasUserId: !!userId
+            });
             return;
         }
 
@@ -98,7 +103,6 @@ export const useDataChannel = ({ peerConnection, userId, isInitiator }: UseDataC
         try {
             dataChannel.send(JSON.stringify(message));
 
-            // Add to local messages
             const chatMessage: ChatMessage = {
                 id: `${userId}-${Date.now()}`,
                 text,
@@ -112,5 +116,9 @@ export const useDataChannel = ({ peerConnection, userId, isInitiator }: UseDataC
         }
     }, [dataChannel, userId]);
 
-    return { messages, sendMessage, isChannelOpen, };
+    return {
+        messages,
+        sendMessage,
+        isChannelOpen,
+    };
 };

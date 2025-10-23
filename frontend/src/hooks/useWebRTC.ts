@@ -17,6 +17,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const [targetId, setTargetId] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [isInitiator, setIsInitiator] = useState(false);
+    const isInitiatorRef = useRef(false);
 
 
     useEffect(() => {
@@ -105,7 +106,11 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const callPeer = async () => {
         if (!pcRef.current || !socket || !userId || !targetId) return;
 
+        isInitiatorRef.current = true;
         setIsInitiator(true); // We are the caller
+
+        // Small delay to ensure state updates propagate
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         const pc = pcRef.current;
         const offer = await pc.createOffer();
