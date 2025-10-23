@@ -22,12 +22,12 @@ export const useDataChannel = ({ peerConnection, userId, isInitiator }: UseDataC
             channel = peerConnection.createDataChannel('chat', {
                 ordered: true,
             });
-            // console.log('Data channel created by initiator');
+            console.log('Data channel created by initiator');
         } else {
             // Callee receives the data channel
             const handleDataChannel = (event: RTCDataChannelEvent) => {
                 channel = event.channel;
-                // console.log('Data channel received by answerer');
+                console.log('Data channel received by answerer');
                 setupDataChannel(channel);
             };
 

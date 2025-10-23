@@ -56,13 +56,13 @@ export const ChatPanel = ({
                     >
                         <div
                             className={`max-w-[70%] px-3 py-2 rounded-lg ${msg.isOwn
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-200 text-gray-800'
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-200 text-gray-800'
                                 }`}
                         >
                             <p className="text-sm break-words">{msg.text}</p>
                             <span className="text-xs opacity-70">
-                                {new Date(msg.timestamp).toLocaleTimeString()}
+                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
                     </div>
@@ -76,7 +76,7 @@ export const ChatPanel = ({
                         type="text"
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
+                        onKeyDown={handleKeyPress}
                         placeholder={isChannelOpen ? "Type a message..." : "Waiting for connection..."}
                         disabled={!isChannelOpen}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
