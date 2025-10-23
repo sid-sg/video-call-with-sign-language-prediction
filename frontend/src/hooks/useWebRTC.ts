@@ -14,8 +14,12 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const pcRef = useRef<RTCPeerConnection | null>(null); // RTCPeerConnection reference
     const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+
+    const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
+
     const [targetId, setTargetId] = useState<string | null>(null);
     const targetIdRef = useRef<string | null>(targetId);
+
     const [isConnected, setIsConnected] = useState(false);
     const [isInitiator, setIsInitiator] = useState(false);
     const isInitiatorRef = useRef(false);
@@ -35,6 +39,12 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
         const pc = new RTCPeerConnection(config);
         pcRef.current = pc;
         setPeerConnection(pc);
+
+        pc.ondatachannel = (event) => {
+            console.log('Data channel received by answerer');
+            const channel = event.channel;
+            setDataChannel(channel);
+        };
 
         // Add local tracks to peer connection
         localStream.getTracks().forEach(track => {
@@ -121,6 +131,8 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
             socket.off('message', handleMessage);
             pc.close();
             setPeerConnection(null);
+            setDataChannel(null);
+            pcRef.current = null;
         };
 
 
@@ -129,13 +141,16 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const callPeer = async () => {
         if (!pcRef.current || !socket || !userId || !targetId) return;
 
+        const pc = pcRef.current;
         isInitiatorRef.current = true;
         setIsInitiator(true); // We are the caller
 
-        // Small delay to ensure state updates propagate
-        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log('Creating data channel as initiator');
+        const channel = pc.createDataChannel('chat', {
+            ordered: true,
+        });
+        setDataChannel(channel); // <-- Set the data channel state
 
-        const pc = pcRef.current;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
@@ -149,6 +164,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
 
     return {
         peerConnection,
+        dataChannel,
         remoteVideoRef,
         targetId,
         setTargetId,

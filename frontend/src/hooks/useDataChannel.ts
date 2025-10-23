@@ -2,87 +2,67 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ChatMessage } from '../types/webrtc.types';
 
 interface UseDataChannelProps {
-    peerConnection: RTCPeerConnection | null;
+    dataChannel: RTCDataChannel | null;
     userId: string | null;
-    isInitiator: boolean;
 }
 
-export const useDataChannel = ({
-    peerConnection,
-    userId,
-    isInitiator
-}: UseDataChannelProps) => {
-    const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
+export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isChannelOpen, setIsChannelOpen] = useState(false);
-    const dataChannelRef = useRef<RTCDataChannel | null>(null);
 
     useEffect(() => {
-        if (!peerConnection) return;
-
-        function setupDataChannel(dc: RTCDataChannel) {
-            dc.onopen = () => {
-                console.log('Data channel is open');
-                setIsChannelOpen(true);
-            };
-
-            dc.onclose = () => {
-                console.log('Data channel is closed');
-                setIsChannelOpen(false);
-            };
-
-            dc.onerror = (error) => {
-                console.error('Data channel error:', error);
-            };
-
-            dc.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const chatMessage: ChatMessage = {
-                        id: `${data.senderId}-${Date.now()}`,
-                        text: data.text,
-                        senderId: data.senderId,
-                        timestamp: data.timestamp,
-                        isOwn: false,
-                    };
-                    setMessages(prev => [...prev, chatMessage]);
-                } catch (error) {
-                    console.error('Error parsing message:', error);
-                }
-            };
-
-            dataChannelRef.current = dc;
-            setDataChannel(dc);
+        if (!dataChannel) {
+            setIsChannelOpen(false);
+            return;
         }
 
-        if (isInitiator) {
-            // Caller creates the data channel IMMEDIATELY
-            console.log('Creating data channel as initiator');
-            const channel = peerConnection.createDataChannel('chat', {
-                ordered: true,
-            });
-            setupDataChannel(channel);
-        } else {
-            // Callee waits for the data channel
-            console.log('Waiting for data channel as answerer');
-            const handleDataChannel = (event: RTCDataChannelEvent) => {
-                console.log('Data channel received by answerer');
-                setupDataChannel(event.channel);
-            };
+        console.log('useDataChannel: Attaching listeners to data channel');
 
-            peerConnection.addEventListener('datachannel', handleDataChannel);
+        dataChannel.onopen = () => {
+            console.log('Data channel is open');
+            setIsChannelOpen(true);
+        };
 
-            return () => {
-                peerConnection.removeEventListener('datachannel', handleDataChannel);
-            };
-        }
+        dataChannel.onclose = () => {
+            console.log('Data channel is closed');
+            setIsChannelOpen(false);
+        };
 
-        return () => {
-            if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
-                dataChannelRef.current.close();
+        dataChannel.onerror = (error) => {
+            console.error('Data channel error:', error);
+        };
+
+        dataChannel.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                const chatMessage: ChatMessage = {
+                    id: `${data.senderId}-${Date.now()}`,
+                    text: data.text,
+                    senderId: data.senderId,
+                    timestamp: data.timestamp,
+                    isOwn: false,
+                };
+                setMessages(prev => [...prev, chatMessage]);
+            } catch (error) {
+                console.error('Error parsing message:', error);
             }
         };
-    }, [peerConnection, isInitiator]);
+
+        // Handle channel being open already if it was created and opened fast
+        if (dataChannel.readyState === 'open') {
+            setIsChannelOpen(true);
+        }
+
+        // Cleanup: remove listeners
+        return () => {
+            if (dataChannel) {
+                dataChannel.onopen = null;
+                dataChannel.onclose = null;
+                dataChannel.onerror = null;
+                dataChannel.onmessage = null;
+            }
+        };
+    }, [dataChannel]); // <-- Only depends on the dataChannel object
 
     const sendMessage = useCallback((text: string) => {
         if (!dataChannel || dataChannel.readyState !== 'open' || !userId) {
@@ -94,6 +74,7 @@ export const useDataChannel = ({
             return;
         }
 
+        // ... (rest of sendMessage is unchanged) ...
         const message = {
             text,
             senderId: userId,

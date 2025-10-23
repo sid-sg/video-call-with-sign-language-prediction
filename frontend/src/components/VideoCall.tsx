@@ -13,11 +13,11 @@ export const VideoCall = () => {
     const { turnServers, isLoadingTurn } = useTurnServers();
     const { localStream, localVideoRef, mediaControls, toggleVideo, toggleAudio } = useMediaStream();
 
-    const { peerConnection, remoteVideoRef, targetId, setTargetId, callPeer, isConnected: peerConnected, isInitiator } =
+    const { remoteVideoRef, targetId, setTargetId, callPeer, isConnected: peerConnected, dataChannel } =
         useWebRTC({
             socket, userId, turnServers, localStream, isLoadingTurn,
         });
-    const { messages, sendMessage, isChannelOpen } = useDataChannel({ peerConnection, userId, isInitiator });
+    const { messages, sendMessage, isChannelOpen } = useDataChannel({ dataChannel, userId });
 
 
     return (
