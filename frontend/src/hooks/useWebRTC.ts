@@ -15,10 +15,14 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
     const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const [targetId, setTargetId] = useState<string | null>(null);
+    const targetIdRef = useRef<string | null>(targetId);
     const [isConnected, setIsConnected] = useState(false);
     const [isInitiator, setIsInitiator] = useState(false);
     const isInitiatorRef = useRef(false);
 
+    useEffect(() => {
+        targetIdRef.current = targetId;
+    }, [targetId]);
 
     useEffect(() => {
         if (!socket || isLoadingTurn || !localStream) return;
@@ -52,7 +56,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
                     type: 'iceCandidate',
                     candidate: event.candidate,
                     from: userId,
-                    to: targetId
+                    to: targetIdRef.current
                 });
             }
         };
@@ -97,7 +101,16 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
 
             // If we receive a new ICE candidate → add it to our peer connection
             else if (message.type === 'iceCandidate') {
-                await pc.addIceCandidate(message.candidate!);
+                // Check if PC is already closed
+                if (!pcRef.current || pc.signalingState === 'closed') {
+                    console.warn("Skipping ICE candidate, PC is closed.");
+                    return;
+                }
+                try {
+                    await pc.addIceCandidate(message.candidate!);
+                } catch (error) {
+                    console.error("Error adding ICE candidate:", error);
+                }
             }
         };
 
@@ -111,7 +124,7 @@ export const useWebRTC = ({ socket, userId, turnServers, localStream, isLoadingT
         };
 
 
-    }, [socket, userId, targetId, isLoadingTurn, turnServers, localStream]);
+    }, [socket, userId, isLoadingTurn, turnServers, localStream]);
 
     const callPeer = async () => {
         if (!pcRef.current || !socket || !userId || !targetId) return;
