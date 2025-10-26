@@ -14,7 +14,7 @@ export default defineConfig({
       ]
     })
   ],
-  // optimizeDeps: {
-  //   exclude: ['onnxruntime-web']
-  // }
+  optimizeDeps: {
+    exclude: ['onnxruntime-web']
+  }
 })
