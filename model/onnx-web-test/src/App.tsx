@@ -78,7 +78,7 @@ function App() {
     useEffect(() => {
         if (!modelReady) return;
         if (!videoRef.current || !canvasRef.current) return;
-        if (handsRef.current) return; // Already initialized
+        if (handsRef.current) return; 
 
         let isActive = true;
 
@@ -96,7 +96,7 @@ function App() {
             canvasWorker.postMessage({
                 type: "init",
                 data: { canvas: offscreen, width: 640, height: 480 }
-            }, [offscreen]); // <— transfer ownership
+            }, [offscreen]); 
         }
 
         const hands = new Hands({
@@ -176,38 +176,6 @@ function App() {
         const features: number[] = [];
         for (const l of landmarks) features.push(l.x, l.y, l.z);
         return new Float32Array(features);
-    };
-
-    const drawConnectors = (
-        ctx: CanvasRenderingContext2D,
-        landmarks: NormalizedLandmarkList,
-        w: number,
-        h: number
-    ) => {
-        ctx.strokeStyle = '#00FF00';
-        ctx.lineWidth = 2;
-        for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
-            const s = landmarks[startIdx];
-            const e = landmarks[endIdx];
-            ctx.beginPath();
-            ctx.moveTo(s.x * w, s.y * h);
-            ctx.lineTo(e.x * w, e.y * h);
-            ctx.stroke();
-        }
-    };
-
-    const drawLandmarks = (
-        ctx: CanvasRenderingContext2D,
-        landmarks: NormalizedLandmarkList,
-        w: number,
-        h: number
-    ) => {
-        ctx.fillStyle = '#FF0000';
-        for (const l of landmarks) {
-            ctx.beginPath();
-            ctx.arc(l.x * w, l.y * h, 5, 0, 2 * Math.PI);
-            ctx.fill();
-        }
     };
 
     if (error) {
