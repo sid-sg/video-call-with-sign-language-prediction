@@ -25,7 +25,7 @@ export const useTurnServers = () => {
         };
 
         fetchTurnCredentials();
-    });
+    },[]);
 
     return { turnServers, isLoadingTurn };
 };

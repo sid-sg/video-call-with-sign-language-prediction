@@ -8,14 +8,13 @@ let classMapping: Record<string, number> = {};
 self.onmessage = async (event) => {
     const { type, data } = event.data;
 
-    // ✅ Match 'init' instead of 'load'
     if (type === 'init') {
         try {
             const { modelBuffer, classData } = data;
             classMapping = classData;
 
             session = await ort.InferenceSession.create(modelBuffer, {
-                executionProviders: ['wasm'], // You can switch to ['webgl'] later
+                executionProviders: ['wasm'], 
                 graphOptimizationLevel: 'all',
             });
 
