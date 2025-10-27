@@ -14,6 +14,11 @@ function App() {
     const workerRef = useRef<Worker | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const canvasWorkerRef = useRef<Worker | null>(null);
+    const canvasTransferredRef = useRef(false); // Track if canvas was transferred
+
+    const handsRef = useRef<Hands | null>(null);
+    const cameraRef = useRef<Camera | null>(null);
 
     const [prediction, setPrediction] = useState<Prediction | null>(null);
     const [detectedHand, setDetectedHand] = useState(false);
@@ -21,10 +26,11 @@ function App() {
     const [modelReady, setModelReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handsRef = useRef<Hands | null>(null);
 
     // 🧠 Initialize worker and model
     useEffect(() => {
+        if (workerRef.current) return;
+
         const worker = new Worker(new URL('./onnxWorker.ts', import.meta.url), { type: 'module' });
         workerRef.current = worker;
 
@@ -34,7 +40,7 @@ function App() {
             switch (type) {
                 case 'ready':
                     setModelReady(true);
-                    console.log('✅ ONNX Worker ready');
+                    console.log('ONNX Worker ready');
                     break;
                 case 'result':
                     setPrediction(result);
@@ -56,9 +62,9 @@ function App() {
                 worker.postMessage({
                     type: 'init',
                     data: { modelBuffer, classData }
-                });
+                }, [modelBuffer]);
             } catch (err: any) {
-                console.error('❌ Failed to load ONNX model', err);
+                console.error('Failed to load ONNX model', err);
                 setError(err.message);
             }
         })();
@@ -70,10 +76,28 @@ function App() {
 
     // 🖐️ Initialize MediaPipe Hands
     useEffect(() => {
-        if (!videoRef.current) return;
+        if (!modelReady) return;
+        if (!videoRef.current || !canvasRef.current) return;
+        if (handsRef.current) return; // Already initialized
+
         let isActive = true;
 
         const videoElement = videoRef.current;
+        const canvasElement = canvasRef.current;
+
+        // 🧵 Start rendering worker - only transfer canvas once
+        if (!canvasWorkerRef.current && !canvasTransferredRef.current) {
+            const offscreen = canvasElement.transferControlToOffscreen();
+            canvasTransferredRef.current = true;
+
+            const canvasWorker = new Worker(new URL("./canvasWorker.ts", import.meta.url), { type: "module" });
+            canvasWorkerRef.current = canvasWorker;
+
+            canvasWorker.postMessage({
+                type: "init",
+                data: { canvas: offscreen, width: 640, height: 480 }
+            }, [offscreen]); // <— transfer ownership
+        }
 
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
@@ -87,24 +111,18 @@ function App() {
         });
 
         hands.onResults(async (results: Results) => {
-            if (!isActive) return; // 🚫 Ignore after cleanup
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
+            if (!isActive || !canvasWorkerRef.current) return;
 
-            const w = canvas.width;
-            const h = canvas.height;
-
-            ctx.save();
-            ctx.clearRect(0, 0, w, h);
-            ctx.drawImage(results.image ?? videoElement, 0, 0, w, h);
+            const imageBitmap = await createImageBitmap(videoElement);
 
             if (results.multiHandLandmarks?.length) {
-                setDetectedHand(true);
                 const landmarks = results.multiHandLandmarks[0];
-                drawConnectors(ctx, landmarks, w, h);
-                drawLandmarks(ctx, landmarks, w, h);
+                setDetectedHand(true);
+
+                canvasWorkerRef.current.postMessage({
+                    type: "draw",
+                    data: { imageBitmap, landmarks, connections: HAND_CONNECTIONS },
+                }, [imageBitmap]);
 
                 if (modelReady && workerRef.current) {
                     const features = extractFeatures(landmarks);
@@ -115,55 +133,45 @@ function App() {
                 }
             } else {
                 setDetectedHand(false);
-                setPrediction(null);
+                canvasWorkerRef.current.postMessage({
+                    type: "draw",
+                    data: { imageBitmap, landmarks: [], connections: [] },
+                }, [imageBitmap]);
             }
-
-            ctx.restore();
         });
+
 
         const camera = new Camera(videoElement, {
             onFrame: async () => {
-                if (!isActive) return;
-                try {
-                    await hands.send({ image: videoElement });
-                } catch (err: any) {
-                    if (
-                        err?.message?.includes("deleted object") ||
-                        err?.message?.includes("SolutionWasm")
-                    ) {
-                        // 🔇 Ignore harmless race-condition errors
-                        return;
-                    } else {
-                        console.warn("Unexpected Hands error:", err);
-                    }
-                }
+                if (isActive) await hands.send({ image: videoElement });
             },
             width: 640,
             height: 480,
         });
 
         camera.start();
-        setHandsReady(true);
-        console.log("✅ Camera initialized");
-
         handsRef.current = hands;
+        cameraRef.current = camera;
+        setHandsReady(true);
 
         return () => {
-            console.log("🧹 Cleaning up MediaPipe...");
             isActive = false;
-
-            // ✅ Stop camera first, then close hands
-            camera.stop();
-
-            // Small delay ensures no more onFrame() calls in flight
-            setTimeout(() => {
-                hands.close();
-            }, 100);
+            if (cameraRef.current) {
+                cameraRef.current.stop();
+                cameraRef.current = null;
+            }
+            if (handsRef.current) {
+                handsRef.current.close();
+                handsRef.current = null;
+            }
+            if (canvasWorkerRef.current) {
+                canvasWorkerRef.current.terminate();
+                canvasWorkerRef.current = null;
+            }
         };
-    }, [modelReady]);
+    }, [modelReady]); // Remove modelReady dependency
 
-
-    // 🧮 Extract features
+    // Extract features
     const extractFeatures = (landmarks: NormalizedLandmarkList): Float32Array => {
         const features: number[] = [];
         for (const l of landmarks) features.push(l.x, l.y, l.z);
