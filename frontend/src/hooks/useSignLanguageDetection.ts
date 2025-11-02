@@ -255,14 +255,18 @@ export function useSignLanguageDetection({
             const maxIdx = probabilities.indexOf(Math.max(...probabilities));
             const labels = labelsRef.current;
 
+            // Create new object to force React update
             const result = {
                 label: (labels && labels[maxIdx]) ? labels[maxIdx] : `Class ${maxIdx}`,
                 confidence: probabilities[maxIdx],
                 inferenceTime: end - start,
+                timestamp: Date.now(), // Force new object identity
             };
 
             console.log(`[${instanceId}] 🎯 Prediction: ${result.label} (${(result.confidence * 100).toFixed(1)}%) at index ${maxIdx}/${labels.length}`);
-            setPrediction(result);
+
+            // Force new object reference to trigger React re-render
+            setPrediction({ ...result });
         } catch (err) {
             console.error(`[${instanceId}] ❌ Inference error`, err);
         }
@@ -324,7 +328,7 @@ export function useSignLanguageDetection({
             } else {
                 // Log when video is not ready
                 if (frameCount < 5) {
-                    console.log(`[${instanceId}] ⏸️ Video not ready yet: readyState=${videoElement?.readyState}, width=${videoElement?.videoWidth}, height=${videoElement?.videoHeight}, paused=${videoElement?.paused}`);
+                    // console.log(`[${instanceId}] ⏸️ Video not ready yet: readyState=${videoElement.readyState}, width=${videoElement.videoWidth}, height=${videoElement.videoHeight}, paused=${videoElement.paused}`);
                 }
             }
 

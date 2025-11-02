@@ -21,10 +21,17 @@ export const VideoCall = () => {
 
     // Sign language detection toggle
     const [signAssistEnabled, setSignAssistEnabled] = useState(false);
+    const [currentPrediction, setCurrentPrediction] = useState<{ label: string; confidence: number; inferenceTime: number } | null>(null);
+    const [handDetected, setHandDetected] = useState(false);
 
     const toggleSignAssist = () => {
         setSignAssistEnabled(!signAssistEnabled);
         console.log('Sign Assist toggled:', !signAssistEnabled);
+    };
+
+    const handlePredictionChange = (prediction: { label: string; confidence: number; inferenceTime: number } | null, detected: boolean) => {
+        setCurrentPrediction(prediction);
+        setHandDetected(detected);
     };
 
     return (
@@ -51,6 +58,7 @@ export const VideoCall = () => {
                                     isVideoEnabled={mediaControls.video}
                                     isLocal={true}
                                     enableSignLanguage={signAssistEnabled}
+                                    onPredictionChange={handlePredictionChange}
                                 />
                                 <VideoPlayer
                                     videoRef={remoteVideoRef}
@@ -71,13 +79,53 @@ export const VideoCall = () => {
                                 />
                             </div>
 
-                            {/* Sign Assist Status */}
+                            {/* Sign Assist Status with Prediction */}
                             {signAssistEnabled && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                                    <p className="text-green-700 font-semibold flex items-center justify-center gap-2">
-                                        <span className="animate-pulse">🤟</span>
-                                        Sign Assist Active - Hand detection and recognition enabled
-                                    </p>
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-6 shadow-lg">
+                                    <div className="flex items-center justify-between gap-6">
+                                        {/* Status Text */}
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-3xl animate-pulse">🤟</span>
+                                            <div>
+                                                <p className="text-green-700 font-bold text-lg">Sign Assist Active</p>
+                                                <p className="text-green-600 text-sm">Hand detection and recognition enabled</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Prediction Display */}
+                                        <div className="flex-shrink-0">
+                                            {handDetected && currentPrediction ? (
+                                                <div className="bg-white rounded-xl shadow-xl border-4 border-green-500 p-6 min-w-[200px]">
+                                                    <div className="text-center">
+                                                        <div className="text-7xl font-black text-green-600 mb-2">
+                                                            {currentPrediction.label}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600 space-y-1">
+                                                            <div className="font-semibold">
+                                                                {(currentPrediction.confidence * 100).toFixed(1)}% confident
+                                                            </div>
+                                                            <div className="text-xs text-gray-500">
+                                                                {currentPrediction.inferenceTime.toFixed(1)}ms
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-3 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                                            <div
+                                                                className="bg-green-500 h-full rounded-full transition-all duration-300"
+                                                                style={{ width: `${currentPrediction.confidence * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="bg-white rounded-xl shadow-lg border-2 border-gray-300 p-6 min-w-[200px]">
+                                                    <div className="text-center text-gray-400">
+                                                        <div className="text-5xl mb-2">👋</div>
+                                                        <div className="text-sm">Show your hand</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

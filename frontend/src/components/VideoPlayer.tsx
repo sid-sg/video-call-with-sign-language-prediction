@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { SignLanguageOverlay } from './SignLanguageOverlay';
+// import { SignLanguageOverlay } from './SignLanguageOverlay';
 import { useSignLanguageDetection } from '../hooks/useSignLanguageDetection';
 
 interface VideoPlayerProps {
@@ -9,6 +9,10 @@ interface VideoPlayerProps {
     isVideoEnabled?: boolean;
     isLocal?: boolean;
     enableSignLanguage?: boolean;
+    onPredictionChange?: (
+        prediction: { label: string; confidence: number; inferenceTime: number } | null,
+        detectedHand: boolean
+    ) => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -18,6 +22,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     isVideoEnabled = true,
     isLocal = false,
     enableSignLanguage = false,
+    onPredictionChange,
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [hasStream, setHasStream] = useState(false);
@@ -25,56 +30,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const instanceId = isLocal ? 'local' : 'remote';
     const showSignAssist = isLocal && enableSignLanguage && isVideoEnabled;
 
-    // ✅ Check if video has stream and ensure it's playing
+    // ✅ Detect stream availability
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
         const checkStream = () => {
-            const hasValidStream =
+            const active =
                 !!video.srcObject &&
                 video.readyState >= video.HAVE_METADATA &&
                 video.videoWidth > 0 &&
                 video.videoHeight > 0;
 
-            if (hasValidStream !== hasStream) {
-                console.log(`[${instanceId}] Stream status changed: ${hasValidStream}`, {
-                    srcObject: !!video.srcObject,
-                    readyState: video.readyState,
-                    videoWidth: video.videoWidth,
-                    videoHeight: video.videoHeight,
-                    paused: video.paused
-                });
-                setHasStream(hasValidStream);
+            if (active !== hasStream) {
+                setHasStream(active);
+                console.log(`[${instanceId}] Stream ready:`, active);
             }
 
-            // Ensure video is playing when it has a valid stream
-            if (hasValidStream && video.paused && showSignAssist) {
-                console.log(`[${instanceId}] Video is paused, attempting to play...`);
-                video.play().catch(err => {
-                    console.error(`[${instanceId}] Failed to play video:`, err);
-                });
+            if (active && video.paused) {
+                video.play().catch(() => { });
             }
         };
 
         checkStream();
-        video.addEventListener('loadedmetadata', checkStream);
-        video.addEventListener('loadeddata', checkStream);
-        video.addEventListener('playing', checkStream);
-        video.addEventListener('pause', checkStream);
+        const interval = setInterval(checkStream, 300);
+        return () => clearInterval(interval);
+    }, [videoRef, instanceId, hasStream]);
 
-        const interval = setInterval(checkStream, 500);
-
-        return () => {
-            video.removeEventListener('loadedmetadata', checkStream);
-            video.removeEventListener('loadeddata', checkStream);
-            video.removeEventListener('playing', checkStream);
-            video.removeEventListener('pause', checkStream);
-            clearInterval(interval);
-        };
-    }, [videoRef, instanceId, hasStream, showSignAssist]);
-
-    // ✅ Custom hook for hand + ONNX detection
+    // ✅ Hand + ONNX detection
     const { prediction, detectedHand, modelReady, handsReady } = useSignLanguageDetection({
         videoElement: showSignAssist && hasStream ? videoRef.current : null,
         canvasElement: showSignAssist && hasStream ? canvasRef.current : null,
@@ -84,69 +67,86 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         instanceId,
     });
 
-    // 🧠 Debug logging
+    // ✅ Send prediction up to parent
     useEffect(() => {
-        if (enableSignLanguage) {
-            console.log(
-                `[${instanceId}] Detection state → enabled=${showSignAssist}, stream=${hasStream}, handsReady=${handsReady}, modelReady=${modelReady}`
-            );
-        }
-    }, [showSignAssist, hasStream, handsReady, modelReady, enableSignLanguage, instanceId]);
+        if (!enableSignLanguage || !hasStream) return;
+        if (typeof onPredictionChange !== 'function') return;
+
+        onPredictionChange(
+            prediction
+                ? {
+                    label: prediction.label,
+                    confidence: prediction.confidence,
+                    inferenceTime: prediction.inferenceTime,
+                }
+                : null,
+            !!detectedHand
+        );
+    }, [prediction, detectedHand, hasStream, enableSignLanguage, onPredictionChange]);
+
+    // Debug
+    useEffect(() => {
+        if (!enableSignLanguage) return;
+        console.log(
+            `[${instanceId}] state → stream=${hasStream}, hands=${handsReady}, model=${modelReady}, pred=${prediction?.label}`
+        );
+    }, [hasStream, handsReady, modelReady, prediction, enableSignLanguage, instanceId]);
+
+    const showCanvas = showSignAssist && hasStream && handsReady && modelReady;
 
     return (
         <div className="relative bg-black rounded-lg overflow-hidden shadow-lg w-full max-w-md">
-            {/* Label */}
             <div className="absolute top-2 left-2 bg-black/50 text-white px-3 py-1 rounded text-sm z-10">
-                {label}
+                {label}{' '}
                 {enableSignLanguage && isLocal && (
                     <span className="ml-2 text-xs">
-                        {!hasStream ? '⏸️ No Stream' :
-                            !modelReady ? '⏳ Loading Model' :
-                                !handsReady ? '🔄 Init Hands' :
-                                    '✅ Active'}
+                        {!hasStream
+                            ? '⏸ No Stream'
+                            : !modelReady
+                                ? '⏳ Model'
+                                : !handsReady
+                                    ? '👐 Init'
+                                    : '✅ Ready'}
                     </span>
                 )}
             </div>
 
-            {/* Sign Language Detection Overlay */}
-            {showSignAssist && hasStream && (
+            {/* 🔥 Overlay (Top) */}
+            {/* {showCanvas && (
                 <SignLanguageOverlay
                     prediction={prediction}
-                    detectedHand={detectedHand}
+                    detectedHand={!!detectedHand}
                     modelReady={modelReady}
                 />
-            )}
+            )} */}
 
-            {/* Video element - ALWAYS mounted, just hidden when needed */}
+            {/* 🎥 Video always renders but hidden when canvas draws */}
             <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted={muted}
                 style={{
-                    display: showSignAssist && hasStream ? 'none' : (isVideoEnabled ? 'block' : 'none'),
+                    display: !showCanvas && isVideoEnabled ? 'block' : 'none',
                     width: '100%',
                     height: 'auto',
                     transform: isLocal ? 'scaleX(-1)' : 'none',
                 }}
             />
 
-            {/* Canvas shows video + landmarks when Sign Assist is enabled */}
-            {showSignAssist && hasStream && (
-                <canvas
-                    ref={canvasRef}
-                    width={640}
-                    height={480}
-                    style={{
-                        display: 'block',
-                        width: '100%',
-                        height: 'auto',
-                        transform: isLocal ? 'scaleX(-1)' : 'none',
-                    }}
-                />
-            )}
+            {/* 🖼 Canvas for drawing hands */}
+            <canvas
+                ref={canvasRef}
+                width={640}
+                height={480}
+                style={{
+                    display: showCanvas ? 'block' : 'none',
+                    width: '100%',
+                    height: 'auto',
+                    transform: isLocal ? 'scaleX(-1)' : 'none',
+                }}
+            />
 
-            {/* Placeholder when video is disabled */}
             {!isVideoEnabled && (
                 <div className="flex items-center justify-center h-64 bg-gray-800">
                     <span className="text-white text-4xl">📹</span>
