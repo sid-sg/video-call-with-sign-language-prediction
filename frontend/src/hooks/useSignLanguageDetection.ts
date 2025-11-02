@@ -21,8 +21,6 @@ export function useSignLanguageDetection({
     videoElement,
     canvasElement,
     enabled,
-    width = 640,
-    height = 480,
     instanceId = 'default',
 }: DetectionOptions) {
     const [handsReady, setHandsReady] = useState(false);

@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-// import { SignLanguageOverlay } from './SignLanguageOverlay';
 import { useSignLanguageDetection } from '../hooks/useSignLanguageDetection';
 
 interface VideoPlayerProps {
@@ -110,15 +109,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     </span>
                 )}
             </div>
-
-            {/* 🔥 Overlay (Top) */}
-            {/* {showCanvas && (
-                <SignLanguageOverlay
-                    prediction={prediction}
-                    detectedHand={!!detectedHand}
-                    modelReady={modelReady}
-                />
-            )} */}
 
             {/* 🎥 Video always renders but hidden when canvas draws */}
             <video
