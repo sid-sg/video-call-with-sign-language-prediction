@@ -1,279 +1,15 @@
-// import { useRef, useState, useEffect } from 'react';
-// import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands';
-// import type { Results, NormalizedLandmarkList } from '@mediapipe/hands';
+import { useEffect, useRef, useState } from 'react';
+import * as ort from 'onnxruntime-web';
+import type { Results } from '@mediapipe/hands';
 
-// interface Prediction {
-//     label: string;
-//     confidence: number;
-//     inferenceTime: number;
-// }
-
-// interface UseSignLanguageDetectionProps {
-//     videoElement: HTMLVideoElement | null;
-//     canvasElement: HTMLCanvasElement | null;
-//     enabled: boolean;
-//     width?: number;
-//     height?: number;
-// }
-
-// export const useSignLanguageDetection = ({
-//     videoElement,
-//     canvasElement,
-//     enabled,
-//     width = 640,
-//     height = 480
-// }: UseSignLanguageDetectionProps) => {
-//     const workerRef = useRef<Worker | null>(null);
-//     const canvasWorkerRef = useRef<Worker | null>(null);
-//     const handsRef = useRef<Hands | null>(null);
-//     const canvasTransferredRef = useRef(false);
-//     const animationFrameRef = useRef<number | null>(null);
-
-//     const [prediction, setPrediction] = useState<Prediction | null>(null);
-//     const [detectedHand, setDetectedHand] = useState(false);
-//     const [modelReady, setModelReady] = useState(false);
-//     const [handsReady, setHandsReady] = useState(false);
-
-//     // Initialize ONNX Worker
-//     useEffect(() => {
-//         if (workerRef.current) return;
-
-//         console.log('🚀 Initializing ONNX Worker...');
-//         const worker = new Worker(new URL('../workers/onnxWorker.ts', import.meta.url), { type: 'module' });
-//         workerRef.current = worker;
-
-//         worker.onmessage = (e) => {
-//             const { type, result, error } = e.data;
-//             switch (type) {
-//                 case 'ready':
-//                     setModelReady(true);
-//                     console.log('✅ ONNX Model ready');
-//                     break;
-//                 case 'result':
-//                     console.log('📊 Prediction received:', result);
-//                     setPrediction(result);
-//                     break;
-//                 case 'error':
-//                     console.error('❌ ONNX Worker error:', error);
-//                     break;
-//             }
-//         };
-
-//         (async () => {
-//             try {
-//                 console.log('📥 Fetching model files...');
-//                 const modelResponse = await fetch('/landmark_model.onnx');
-//                 const modelBuffer = await modelResponse.arrayBuffer();
-//                 console.log('✅ Model loaded, size:', modelBuffer.byteLength, 'bytes');
-
-//                 const classResponse = await fetch('/landmark_classes.json');
-//                 const classData = await classResponse.json();
-//                 console.log('✅ Classes loaded:', Object.keys(classData).length, 'classes');
-
-//                 worker.postMessage({
-//                     type: 'init',
-//                     data: { modelBuffer, classData }
-//                 }, [modelBuffer]);
-//             } catch (err: any) {
-//                 console.error('❌ Failed to load ONNX model', err);
-//             }
-//         })();
-
-//         return () => {
-//             console.log('🛑 Terminating ONNX Worker');
-//             worker.terminate();
-//             workerRef.current = null;
-//         };
-//     }, []);
-
-//     // Initialize Canvas Worker and MediaPipe Hands
-//     useEffect(() => {
-//         console.log('🔍 Checking initialization conditions:', {
-//             enabled,
-//             hasVideo: !!videoElement,
-//             hasCanvas: !!canvasElement,
-//             modelReady,
-//             handsExists: !!handsRef.current
-//         });
-
-//         if (!enabled) {
-//             console.log('⏸️ Sign language detection disabled');
-//             return;
-//         }
-
-//         if (!videoElement || !canvasElement) {
-//             console.log('⏳ Waiting for video/canvas elements...');
-//             return;
-//         }
-
-//         if (!modelReady) {
-//             console.log('⏳ Waiting for model to be ready...');
-//             return;
-//         }
-
-//         if (handsRef.current) {
-//             console.log('✅ MediaPipe Hands already initialized');
-//             return;
-//         }
-
-//         console.log('🚀 Initializing MediaPipe Hands and Canvas Worker...');
-//         let isActive = true;
-
-//         // Transfer canvas to worker (only once)
-//         if (!canvasWorkerRef.current && !canvasTransferredRef.current) {
-//             try {
-//                 console.log('🎨 Transferring canvas to worker...');
-//                 const offscreen = canvasElement.transferControlToOffscreen();
-//                 canvasTransferredRef.current = true;
-
-//                 const canvasWorker = new Worker(
-//                     new URL('../workers/canvasWorker.ts', import.meta.url),
-//                     { type: 'module' }
-//                 );
-//                 canvasWorkerRef.current = canvasWorker;
-
-//                 canvasWorker.postMessage({
-//                     type: 'init',
-//                     data: { canvas: offscreen, width, height }
-//                 }, [offscreen]);
-
-//                 console.log('✅ Canvas worker initialized');
-//             } catch (err) {
-//                 console.error('❌ Canvas transfer failed:', err);
-//                 return;
-//             }
-//         }
-
-//         // Initialize MediaPipe Hands
-//         console.log('🖐️ Creating MediaPipe Hands instance...');
-//         const hands = new Hands({
-//             locateFile: (file) => {
-//                 const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-//                 console.log('📦 Loading MediaPipe file:', url);
-//                 return url;
-//             },
-//         });
-
-//         hands.setOptions({
-//             maxNumHands: 1,
-//             modelComplexity: 1,
-//             minDetectionConfidence: 0.7,
-//             minTrackingConfidence: 0.5,
-//         });
-//         console.log('⚙️ MediaPipe Hands options set');
-
-//         hands.onResults(async (results: Results) => {
-//             if (!isActive || !canvasWorkerRef.current) return;
-
-//             const imageBitmap = await createImageBitmap(videoElement);
-
-//             if (results.multiHandLandmarks?.length) {
-//                 const landmarks = results.multiHandLandmarks[0];
-//                 setDetectedHand(true);
-
-//                 console.log('✋ Hand detected with', landmarks.length, 'landmarks');
-
-//                 // Draw on canvas
-//                 canvasWorkerRef.current.postMessage({
-//                     type: 'draw',
-//                     data: {
-//                         imageBitmap,
-//                         landmarks,
-//                         connections: HAND_CONNECTIONS
-//                     },
-//                 }, [imageBitmap]);
-
-//                 // Run inference
-//                 if (workerRef.current) {
-//                     const features = extractFeatures(landmarks);
-//                     console.log('🧠 Sending inference request, features length:', features.length);
-//                     workerRef.current.postMessage({
-//                         type: 'infer',
-//                         data: { landmarks: features },
-//                     });
-//                 } else {
-//                     console.warn('⚠️ ONNX worker not ready');
-//                 }
-//             } else {
-//                 setDetectedHand(false);
-//                 setPrediction(null);
-
-//                 // Draw plain video
-//                 canvasWorkerRef.current.postMessage({
-//                     type: 'draw',
-//                     data: { imageBitmap, landmarks: [], connections: [] },
-//                 }, [imageBitmap]);
-//             }
-//         });
-
-//         handsRef.current = hands;
-//         setHandsReady(true);
-
-//         // Process frames
-//         const processFrame = async () => {
-//             if (isActive && videoElement && handsRef.current) {
-//                 try {
-//                     await handsRef.current.send({ image: videoElement });
-//                 } catch (err) {
-//                     console.error('❌ Error processing frame:', err);
-//                 }
-//             }
-//             animationFrameRef.current = requestAnimationFrame(processFrame);
-//         };
-
-//         console.log('▶️ Starting frame processing...');
-//         processFrame();
-
-//         return () => {
-//             console.log('🛑 Cleaning up MediaPipe Hands...');
-//             isActive = false;
-//             if (animationFrameRef.current) {
-//                 cancelAnimationFrame(animationFrameRef.current);
-//             }
-//             if (handsRef.current) {
-//                 handsRef.current.close();
-//                 handsRef.current = null;
-//             }
-//         };
-//     }, [enabled, videoElement, canvasElement, modelReady, width, height]);
-
-//     // Cleanup canvas worker on unmount
-//     useEffect(() => {
-//         return () => {
-//             if (canvasWorkerRef.current) {
-//                 canvasWorkerRef.current.terminate();
-//                 canvasWorkerRef.current = null;
-//             }
-//         };
-//     }, []);
-
-//     const extractFeatures = (landmarks: NormalizedLandmarkList): Float32Array => {
-//         const features: number[] = [];
-//         for (const l of landmarks) features.push(l.x, l.y, l.z);
-//         return new Float32Array(features);
-//     };
-
-//     return {
-//         prediction,
-//         detectedHand,
-//         modelReady,
-//         handsReady,
-//     };
-// };
-
-import { useRef, useState, useEffect } from 'react';
-import { Hands } from '@mediapipe/hands';
-import type { Results, NormalizedLandmarkList } from '@mediapipe/hands';
-
-// Define hand connections manually (21 landmarks, indices 0-20)
-const HAND_CONNECTIONS: [number, number][] = [
-    [0, 1], [1, 2], [2, 3], [3, 4],           // Thumb
-    [0, 5], [5, 6], [6, 7], [7, 8],           // Index finger
-    [0, 9], [9, 10], [10, 11], [11, 12],      // Middle finger
-    [0, 13], [13, 14], [14, 15], [15, 16],    // Ring finger
-    [0, 17], [17, 18], [18, 19], [19, 20],    // Pinky
-    [5, 9], [9, 13], [13, 17]                 // Palm
-];
+interface DetectionOptions {
+    videoElement: HTMLVideoElement | null;
+    canvasElement: HTMLCanvasElement | null;
+    enabled: boolean;
+    width?: number;
+    height?: number;
+    instanceId?: string;
+}
 
 interface Prediction {
     label: string;
@@ -281,259 +17,347 @@ interface Prediction {
     inferenceTime: number;
 }
 
-interface UseSignLanguageDetectionProps {
-    videoElement: HTMLVideoElement | null;
-    canvasElement: HTMLCanvasElement | null;
-    enabled: boolean;
-    width?: number;
-    height?: number;
-    instanceId: string; // Add unique ID to prevent conflicts
-}
-
-export const useSignLanguageDetection = ({
+export function useSignLanguageDetection({
     videoElement,
     canvasElement,
     enabled,
     width = 640,
     height = 480,
-    instanceId
-}: UseSignLanguageDetectionProps) => {
-    const workerRef = useRef<Worker | null>(null);
-    const canvasWorkerRef = useRef<Worker | null>(null);
-    const handsRef = useRef<Hands | null>(null);
-    const canvasTransferredRef = useRef(false);
-    const animationFrameRef = useRef<number | null>(null);
-    const initializingRef = useRef(false);
-
-    const [prediction, setPrediction] = useState<Prediction | null>(null);
-    const [detectedHand, setDetectedHand] = useState(false);
-    const [modelReady, setModelReady] = useState(false);
+    instanceId = 'default',
+}: DetectionOptions) {
     const [handsReady, setHandsReady] = useState(false);
+    const [modelReady, setModelReady] = useState(false);
+    const [prediction, setPrediction] = useState<Prediction | null>(null);
+    const [detectedHand, setDetectedHand] = useState<any | null>(null);
 
-    // Initialize ONNX Worker (shared across instances)
+    const handsRef = useRef<any>(null);
+    const sessionRef = useRef<ort.InferenceSession | null>(null);
+    const labelsRef = useRef<string[]>([]);
+    const animationFrameRef = useRef<number | null>(null);
+    const isProcessingRef = useRef(false);
+    const videoElementRef = useRef<HTMLVideoElement | null>(null);
+    const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
+
+    // Update refs when props change
     useEffect(() => {
-        if (workerRef.current) return;
+        videoElementRef.current = videoElement;
+        canvasElementRef.current = canvasElement;
+    }, [videoElement, canvasElement]);
 
-        console.log(`[${instanceId}] 🚀 Initializing ONNX Worker...`);
-        const worker = new Worker(new URL('../workers/onnxWorker.ts', import.meta.url), { type: 'module' });
-        workerRef.current = worker;
-
-        worker.onmessage = (e) => {
-            const { type, result, error } = e.data;
-            switch (type) {
-                case 'ready':
-                    setModelReady(true);
-                    console.log(`[${instanceId}] ✅ ONNX Model ready`);
-                    break;
-                case 'result':
-                    console.log(`[${instanceId}] 📊 Prediction:`, result.label);
-                    setPrediction(result);
-                    break;
-                case 'error':
-                    console.error(`[${instanceId}] ❌ ONNX Worker error:`, error);
-                    break;
-            }
-        };
-
-        (async () => {
+    /** ---- Load ONNX model ---- */
+    useEffect(() => {
+        async function loadModel() {
             try {
-                const modelResponse = await fetch('/landmark_model.onnx');
-                const modelBuffer = await modelResponse.arrayBuffer();
-                console.log(`[${instanceId}] ✅ Model loaded`);
+                console.log(`[${instanceId}] ⏳ Loading ONNX model...`);
+                const session = await ort.InferenceSession.create('/landmark_model.onnx', {
+                    executionProviders: ['wasm'],
+                });
 
-                const classResponse = await fetch('/landmark_classes.json');
-                const classData = await classResponse.json();
-                console.log(`[${instanceId}] ✅ Classes loaded`);
+                const labelResponse = await fetch('/landmark_classes.json');
+                const labelText = await labelResponse.text();
+                console.log(`[${instanceId}] 📄 Label file content:`, labelText);
 
-                worker.postMessage({
-                    type: 'init',
-                    data: { modelBuffer, classData }
-                }, [modelBuffer]);
-            } catch (err: any) {
-                console.error(`[${instanceId}] ❌ Failed to load ONNX model`, err);
+                let labels: string[] = [];
+                try {
+                    const labelData = JSON.parse(labelText);
+                    console.log(`[${instanceId}] 📋 Parsed label data:`, labelData);
+
+                    // Check if it's a dictionary {"A": 0, "B": 1} or array ["A", "B"]
+                    if (Array.isArray(labelData)) {
+                        labels = labelData;
+                    } else if (typeof labelData === 'object') {
+                        // Convert {"A": 0, "B": 1} to ["A", "B"]
+                        const entries = Object.entries(labelData) as [string, number][];
+                        labels = new Array(entries.length);
+                        entries.forEach(([label, index]) => {
+                            labels[index] = label;
+                        });
+                    }
+                    console.log(`[${instanceId}] 📋 Final label array:`, labels);
+                } catch (e) {
+                    console.error(`[${instanceId}] ❌ Failed to parse labels JSON:`, e);
+                }
+
+                // Log model info
+                console.log(`[${instanceId}] 📋 Model inputs:`, session.inputNames);
+                console.log(`[${instanceId}] 📋 Model outputs:`, session.outputNames);
+
+                sessionRef.current = session;
+                labelsRef.current = labels;
+                setModelReady(true);
+                console.log(`[${instanceId}] ✅ ONNX model ready with ${labels.length} classes`);
+            } catch (err) {
+                console.error(`[${instanceId}] ❌ ONNX load error`, err);
             }
-        })();
+        }
+        loadModel();
 
         return () => {
-            console.log(`[${instanceId}] 🛑 Terminating ONNX Worker`);
-            worker.terminate();
-            workerRef.current = null;
+            sessionRef.current = null;
         };
     }, [instanceId]);
 
-    // Initialize Canvas Worker and MediaPipe Hands
+    /** ---- Init MediaPipe Hands ---- */
     useEffect(() => {
-        if (!enabled) {
-            console.log(`[${instanceId}] ⏸️ Sign language detection disabled`);
-            // Cleanup if disabled
-            if (handsRef.current) {
-                handsRef.current.close();
-                handsRef.current = null;
-                setHandsReady(false);
-            }
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-            }
+        if (!enabled || !modelReady) {
+            console.log(`[${instanceId}] ⏸️ Not initializing Hands: enabled=${enabled}, modelReady=${modelReady}`);
             return;
         }
 
-        if (!videoElement || !canvasElement) {
-            console.log(`[${instanceId}] ⏳ Waiting for video/canvas elements...`);
+        // Prevent double initialization
+        if (handsRef.current) {
+            console.log(`[${instanceId}] ⚠️ Hands already initialized, skipping`);
             return;
         }
 
-        if (!modelReady) {
-            console.log(`[${instanceId}] ⏳ Waiting for model...`);
-            return;
-        }
+        let isMounted = true;
 
-        if (handsRef.current || initializingRef.current) {
-            console.log(`[${instanceId}] ✅ Already initialized`);
-            return;
-        }
-
-        initializingRef.current = true;
-        console.log(`[${instanceId}] 🚀 Initializing MediaPipe Hands...`);
-        let isActive = true;
-
-        // Transfer canvas to worker (only once per canvas)
-        if (!canvasWorkerRef.current && !canvasTransferredRef.current) {
+        async function initHands() {
             try {
-                console.log(`[${instanceId}] 🎨 Transferring canvas...`);
-                const offscreen = canvasElement.transferControlToOffscreen();
-                canvasTransferredRef.current = true;
+                const { Hands, HAND_CONNECTIONS } = await import('@mediapipe/hands');
 
-                const canvasWorker = new Worker(
-                    new URL('../workers/canvasWorker.ts', import.meta.url),
-                    { type: 'module' }
-                );
-                canvasWorkerRef.current = canvasWorker;
+                if (!isMounted) return;
 
-                canvasWorker.postMessage({
-                    type: 'init',
-                    data: { canvas: offscreen, width, height }
-                }, [offscreen]);
+                const hands = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+                });
 
-                console.log(`[${instanceId}] ✅ Canvas worker ready`);
-            } catch (err) {
-                console.error(`[${instanceId}] ❌ Canvas transfer failed:`, err);
-                initializingRef.current = false;
-                return;
-            }
-        }
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.7,
+                    minTrackingConfidence: 0.5,
+                });
 
-        // Initialize MediaPipe Hands - Create NEW instance for each video
-        console.log(`[${instanceId}] 🖐️ Creating MediaPipe Hands instance...`);
+                hands.onResults(async (results: Results) => {
+                    const canvas = canvasElementRef.current;
+                    const video = videoElementRef.current;
 
-        const hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-        });
-
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.5,
-        });
-
-        hands.onResults(async (results: Results) => {
-            if (!isActive || !canvasWorkerRef.current) return;
-
-            try {
-                const imageBitmap = await createImageBitmap(videoElement);
-
-                if (results.multiHandLandmarks?.length) {
-                    const landmarks = results.multiHandLandmarks[0];
-                    setDetectedHand(true);
+                    console.log(`[${instanceId}] 📊 onResults called, has canvas: ${!!canvas}, has video: ${!!video}`);
 
                     // Draw on canvas
-                    canvasWorkerRef.current.postMessage({
-                        type: 'draw',
-                        data: {
-                            imageBitmap,
-                            landmarks,
-                            connections: HAND_CONNECTIONS
-                        },
-                    }, [imageBitmap]);
+                    if (canvas && video) {
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            console.log(`[${instanceId}] 🎨 Drawing to canvas...`);
+                            ctx.save();
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    // Run inference
-                    if (workerRef.current) {
-                        const features = extractFeatures(landmarks);
-                        workerRef.current.postMessage({
-                            type: 'infer',
-                            data: { landmarks: features },
-                        });
+                            // ✅ CRITICAL: Draw the video frame first
+                            try {
+                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                console.log(`[${instanceId}] ✅ Video drawn successfully`);
+                            } catch (err) {
+                                console.error(`[${instanceId}] ❌ Failed to draw video:`, err);
+                                isProcessingRef.current = false;
+                                return;
+                            }
+
+                            // Draw hand landmarks if detected
+                            if (results.multiHandLandmarks?.length) {
+                                const lm = results.multiHandLandmarks[0];
+                                setDetectedHand(lm);
+                                console.log(`[${instanceId}] ✋ Hand detected with ${lm.length} landmarks`);
+
+                                // Draw connections
+                                ctx.strokeStyle = '#00FF00';
+                                ctx.lineWidth = 2;
+                                for (const connection of HAND_CONNECTIONS) {
+                                    const from = lm[connection[0]];
+                                    const to = lm[connection[1]];
+                                    ctx.beginPath();
+                                    ctx.moveTo(from.x * canvas.width, from.y * canvas.height);
+                                    ctx.lineTo(to.x * canvas.width, to.y * canvas.height);
+                                    ctx.stroke();
+                                }
+
+                                // Draw landmarks
+                                ctx.fillStyle = '#FF0000';
+                                for (const landmark of lm) {
+                                    ctx.beginPath();
+                                    ctx.arc(
+                                        landmark.x * canvas.width,
+                                        landmark.y * canvas.height,
+                                        5,
+                                        0,
+                                        2 * Math.PI
+                                    );
+                                    ctx.fill();
+                                }
+
+                                // Run inference
+                                console.log(`[${instanceId}] 🧠 Running inference...`);
+                                await extractFeatures(lm);
+                            } else {
+                                console.log(`[${instanceId}] 🚫 No hand detected`);
+                                setDetectedHand(null);
+                                setPrediction(null);
+                            }
+
+                            ctx.restore();
+                        }
                     }
-                } else {
-                    setDetectedHand(false);
-                    setPrediction(null);
 
-                    // Draw plain video
-                    canvasWorkerRef.current.postMessage({
-                        type: 'draw',
-                        data: { imageBitmap, landmarks: [], connections: [] },
-                    }, [imageBitmap]);
+                    isProcessingRef.current = false;
+                });
+
+                if (!isMounted) {
+                    hands.close();
+                    return;
                 }
+
+                handsRef.current = hands;
+                setHandsReady(true);
+                console.log(`[${instanceId}] ✅ MediaPipe Hands ready`);
             } catch (err) {
-                console.error(`[${instanceId}] ❌ Error in onResults:`, err);
+                console.error(`[${instanceId}] ❌ Hands init failed`, err);
             }
-        });
+        }
 
-        handsRef.current = hands;
-        setHandsReady(true);
-        initializingRef.current = false;
+        initHands();
 
-        // Process frames
-        const processFrame = async () => {
-            if (!isActive || !handsRef.current) return;
+        return () => {
+            isMounted = false;
+            console.log(`[${instanceId}] 🧹 Cleaning up Hands init effect`);
+        };
+    }, [enabled, modelReady, instanceId]);
 
-            try {
-                await handsRef.current.send({ image: videoElement });
-            } catch (err) {
-                console.error(`[${instanceId}] ❌ Error processing frame:`, err);
+    /** ---- Inference ---- */
+    async function extractFeatures(landmarks: any[]) {
+        const session = sessionRef.current;
+        if (!session || !modelReady) {
+            console.log(`[${instanceId}] ⚠️ Cannot run inference: session=${!!session}, modelReady=${modelReady}`);
+            return;
+        }
+
+        const input = new Float32Array(landmarks.flatMap(p => [p.x, p.y, p.z]));
+
+        try {
+            const inputName = session.inputNames[0];
+            const outputName = session.outputNames[0];
+
+            const tensor = new ort.Tensor('float32', input, [1, input.length]);
+            const feeds = { [inputName]: tensor };
+
+            const start = performance.now();
+            const output = await session.run(feeds);
+            const end = performance.now();
+
+            const outputTensor = output[outputName];
+            const logits = Array.from(outputTensor.data as Float32Array);
+
+            // Apply softmax to convert logits to probabilities
+            const maxLogit = Math.max(...logits);
+            const expScores = logits.map(x => Math.exp(x - maxLogit));
+            const sumExp = expScores.reduce((a, b) => a + b, 0);
+            const probabilities = expScores.map(x => x / sumExp);
+
+            const maxIdx = probabilities.indexOf(Math.max(...probabilities));
+            const labels = labelsRef.current;
+
+            const result = {
+                label: (labels && labels[maxIdx]) ? labels[maxIdx] : `Class ${maxIdx}`,
+                confidence: probabilities[maxIdx],
+                inferenceTime: end - start,
+            };
+
+            console.log(`[${instanceId}] 🎯 Prediction: ${result.label} (${(result.confidence * 100).toFixed(1)}%) at index ${maxIdx}/${labels.length}`);
+            setPrediction(result);
+        } catch (err) {
+            console.error(`[${instanceId}] ❌ Inference error`, err);
+        }
+    }
+
+    /** ---- Processing Loop (No Camera - uses existing video) ---- */
+    useEffect(() => {
+        console.log(`[${instanceId}] 🔍 Processing loop check: enabled=${enabled}, handsReady=${handsReady}, hasVideo=${!!videoElement}, hasCanvas=${!!canvasElement}`);
+
+        if (!enabled || !handsReady || !videoElement || !canvasElement) {
+            console.log(`[${instanceId}] ⏸️ Processing loop not starting`);
+            return;
+        }
+
+        const hands = handsRef.current;
+        if (!hands) {
+            console.log(`[${instanceId}] ⚠️ Hands ref is null at processing start`);
+            return;
+        }
+
+        let isActive = true;
+        let frameCount = 0;
+
+        async function processFrame() {
+            if (!isActive || !enabled || isProcessingRef.current) {
+                if (isActive) {
+                    animationFrameRef.current = requestAnimationFrame(processFrame);
+                }
+                return;
+            }
+
+            const currentHands = handsRef.current;
+            if (!currentHands) {
+                console.warn(`[${instanceId}] ⚠️ Hands ref is null, stopping processing`);
+                return;
+            }
+
+            // Check if video is playing and has data
+            if (videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA &&
+                videoElement.videoWidth > 0 &&
+                videoElement.videoHeight > 0) {
+
+                isProcessingRef.current = true;
+                frameCount++;
+
+                if (frameCount % 30 === 0) { // Log every 30 frames
+                    console.log(`[${instanceId}] 📊 Processing frame #${frameCount}`);
+                }
+
+                try {
+                    if (frameCount === 1) console.log(`[${instanceId}] 📤 Sending first frame to MediaPipe...`);
+                    await currentHands.send({ image: videoElement });
+                    if (frameCount === 1) console.log(`[${instanceId}] ✅ First frame sent successfully`);
+                } catch (err) {
+                    console.error(`[${instanceId}] ❌ Processing error:`, err);
+                    console.error(`Video state: readyState=${videoElement.readyState}, width=${videoElement.videoWidth}, height=${videoElement.videoHeight}, paused=${videoElement.paused}`);
+                    isProcessingRef.current = false;
+                }
+            } else {
+                // Log when video is not ready
+                if (frameCount < 5) {
+                    console.log(`[${instanceId}] ⏸️ Video not ready yet: readyState=${videoElement?.readyState}, width=${videoElement?.videoWidth}, height=${videoElement?.videoHeight}, paused=${videoElement?.paused}`);
+                }
             }
 
             if (isActive) {
                 animationFrameRef.current = requestAnimationFrame(processFrame);
             }
-        };
+        }
 
-        console.log(`[${instanceId}] ▶️ Starting frame processing...`);
+        console.log(`[${instanceId}] 🎥 Starting processing loop...`);
         processFrame();
 
         return () => {
-            console.log(`[${instanceId}] 🛑 Cleaning up MediaPipe...`);
+            console.log(`[${instanceId}] 🛑 Stopping processing loop (frameCount: ${frameCount})`);
             isActive = false;
-
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
             }
+            isProcessingRef.current = false;
+        };
+    }, [enabled, handsReady, videoElement, canvasElement]);
 
+    // Separate cleanup effect for hands
+    useEffect(() => {
+        return () => {
             if (handsRef.current) {
+                console.log(`[${instanceId}] 🧹 Cleaning up MediaPipe Hands`);
                 handsRef.current.close();
                 handsRef.current = null;
                 setHandsReady(false);
             }
-
-            initializingRef.current = false;
         };
-    }, [enabled, videoElement, canvasElement, modelReady, width, height, instanceId]);
-
-    // Cleanup canvas worker on unmount
-    useEffect(() => {
-        return () => {
-            if (canvasWorkerRef.current) {
-                canvasWorkerRef.current.terminate();
-                canvasWorkerRef.current = null;
-            }
-        };
-    }, []);
-
-    const extractFeatures = (landmarks: NormalizedLandmarkList): Float32Array => {
-        const features: number[] = [];
-        for (const l of landmarks) features.push(l.x, l.y, l.z);
-        return new Float32Array(features);
-    };
+    }, [instanceId]);
 
     return {
         prediction,
@@ -541,4 +365,4 @@ export const useSignLanguageDetection = ({
         modelReady,
         handsReady,
     };
-};
+}
