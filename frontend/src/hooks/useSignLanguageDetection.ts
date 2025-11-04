@@ -131,22 +131,22 @@ export function useSignLanguageDetection({
                     const canvas = canvasElementRef.current;
                     const video = videoElementRef.current;
 
-                    console.log(`[${instanceId}] 📊 onResults called, has canvas: ${!!canvas}, has video: ${!!video}`);
+                    // console.log(`[${instanceId}] 📊 onResults called, has canvas: ${!!canvas}, has video: ${!!video}`);
 
                     // Draw on canvas
                     if (canvas && video) {
                         const ctx = canvas.getContext('2d');
                         if (ctx) {
-                            console.log(`[${instanceId}] 🎨 Drawing to canvas...`);
+                            // console.log(`[${instanceId}] 🎨 Drawing to canvas...`);
                             ctx.save();
                             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                            // ✅ CRITICAL: Draw the video frame first
+                            // Draw the video frame first
                             try {
                                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                console.log(`[${instanceId}] ✅ Video drawn successfully`);
+                                // console.log(`[${instanceId}] ✅ Video drawn successfully`);
                             } catch (err) {
-                                console.error(`[${instanceId}] ❌ Failed to draw video:`, err);
+                                // console.error(`[${instanceId}] ❌ Failed to draw video:`, err);
                                 isProcessingRef.current = false;
                                 return;
                             }
@@ -155,7 +155,7 @@ export function useSignLanguageDetection({
                             if (results.multiHandLandmarks?.length) {
                                 const lm = results.multiHandLandmarks[0];
                                 setDetectedHand(lm);
-                                console.log(`[${instanceId}] ✋ Hand detected with ${lm.length} landmarks`);
+                                // console.log(`[${instanceId}] ✋ Hand detected with ${lm.length} landmarks`);
 
                                 // Draw connections
                                 ctx.strokeStyle = '#00FF00';
@@ -184,10 +184,10 @@ export function useSignLanguageDetection({
                                 }
 
                                 // Run inference
-                                console.log(`[${instanceId}] 🧠 Running inference...`);
+                                // console.log(`[${instanceId}] 🧠 Running inference...`);
                                 await extractFeatures(lm);
                             } else {
-                                console.log(`[${instanceId}] 🚫 No hand detected`);
+                                // console.log(`[${instanceId}] 🚫 No hand detected`);
                                 setDetectedHand(null);
                                 setPrediction(null);
                             }
@@ -221,6 +221,9 @@ export function useSignLanguageDetection({
     }, [enabled, modelReady, instanceId]);
 
     /** ---- Inference ---- */
+    const lastPredictionRef = useRef<string>('');
+
+
     async function extractFeatures(landmarks: any[]) {
         const session = sessionRef.current;
         if (!session || !modelReady) {
@@ -253,18 +256,21 @@ export function useSignLanguageDetection({
             const maxIdx = probabilities.indexOf(Math.max(...probabilities));
             const labels = labelsRef.current;
 
-            // Create new object to force React update
-            const result = {
-                label: (labels && labels[maxIdx]) ? labels[maxIdx] : `Class ${maxIdx}`,
-                confidence: probabilities[maxIdx],
-                inferenceTime: end - start,
-                timestamp: Date.now(), // Force new object identity
-            };
+            const label = (labels && labels[maxIdx]) ? labels[maxIdx] : `Class ${maxIdx}`;
+            const confidence = probabilities[maxIdx];
 
-            console.log(`[${instanceId}] 🎯 Prediction: ${result.label} (${(result.confidence * 100).toFixed(1)}%) at index ${maxIdx}/${labels.length}`);
+            // Only update if the prediction changed significantly
+            const predictionKey = `${label}-${Math.floor(confidence * 100)}`;
+            if (predictionKey !== lastPredictionRef.current) {
+                lastPredictionRef.current = predictionKey;
 
-            // Force new object reference to trigger React re-render
-            setPrediction({ ...result });
+                setPrediction({
+                    label,
+                    confidence,
+                    inferenceTime: end - start,
+                });
+            }
+
         } catch (err) {
             console.error(`[${instanceId}] ❌ Inference error`, err);
         }
@@ -272,7 +278,7 @@ export function useSignLanguageDetection({
 
     /** ---- Processing Loop (No Camera - uses existing video) ---- */
     useEffect(() => {
-        console.log(`[${instanceId}] 🔍 Processing loop check: enabled=${enabled}, handsReady=${handsReady}, hasVideo=${!!videoElement}, hasCanvas=${!!canvasElement}`);
+        // console.log(`[${instanceId}] 🔍 Processing loop check: enabled=${enabled}, handsReady=${handsReady}, hasVideo=${!!videoElement}, hasCanvas=${!!canvasElement}`);
 
         if (!enabled || !handsReady || !videoElement || !canvasElement) {
             console.log(`[${instanceId}] ⏸️ Processing loop not starting`);
@@ -310,14 +316,14 @@ export function useSignLanguageDetection({
                 isProcessingRef.current = true;
                 frameCount++;
 
-                if (frameCount % 30 === 0) { // Log every 30 frames
-                    console.log(`[${instanceId}] 📊 Processing frame #${frameCount}`);
-                }
+                // if (frameCount % 30 === 0) { // Log every 30 frames
+                //     console.log(`[${instanceId}] 📊 Processing frame #${frameCount}`);
+                // }
 
                 try {
-                    if (frameCount === 1) console.log(`[${instanceId}] 📤 Sending first frame to MediaPipe...`);
+                    // if (frameCount === 1) console.log(`[${instanceId}] 📤 Sending first frame to MediaPipe...`);
                     await currentHands.send({ image: videoElement });
-                    if (frameCount === 1) console.log(`[${instanceId}] ✅ First frame sent successfully`);
+                    // if (frameCount === 1) console.log(`[${instanceId}] ✅ First frame sent successfully`);
                 } catch (err) {
                     console.error(`[${instanceId}] ❌ Processing error:`, err);
                     console.error(`Video state: readyState=${videoElement.readyState}, width=${videoElement.videoWidth}, height=${videoElement.videoHeight}, paused=${videoElement.paused}`);
@@ -335,7 +341,7 @@ export function useSignLanguageDetection({
             }
         }
 
-        console.log(`[${instanceId}] 🎥 Starting processing loop...`);
+        // console.log(`[${instanceId}] 🎥 Starting processing loop...`);
         processFrame();
 
         return () => {
@@ -347,7 +353,8 @@ export function useSignLanguageDetection({
             }
             isProcessingRef.current = false;
         };
-    }, [enabled, handsReady, videoElement, canvasElement]);
+    }, [enabled, handsReady]);
+
 
     // Separate cleanup effect for hands
     useEffect(() => {
