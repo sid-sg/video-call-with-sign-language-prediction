@@ -7,6 +7,7 @@ import { CONFIG } from "../config/env";
 import { initSignaling } from "./signaling";
 import turnRouter from "./routes/turn";
 import healthRouter from "./routes/health";
+import genaiRouter from "./routes/genai";
 
 const app = express();
 app.use(cors({ origin: CONFIG.ALLOWED_ORIGIN }));
@@ -15,6 +16,8 @@ app.use(express.json());
 // REST routes
 app.use("/health", healthRouter);
 app.use("/api", turnRouter);
+app.use("/api", genaiRouter);
+
 
 const httpServer = createServer(app);
 

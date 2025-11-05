@@ -34,7 +34,6 @@ export const ChatPanel = ({
 
         setIsImproving(true);
         try {
-            // Call your backend API here
             const response = await fetch('/api/improve-text', {
                 method: 'POST',
                 headers: {
