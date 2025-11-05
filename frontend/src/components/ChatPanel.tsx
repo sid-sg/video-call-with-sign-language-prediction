@@ -34,7 +34,7 @@ export const ChatPanel = ({
 
         setIsImproving(true);
         try {
-            const response = await fetch('/api/improve-text', {
+            const response = await fetch('https://webrtc-video-calling-demo.onrender.com/api/improve-text', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
