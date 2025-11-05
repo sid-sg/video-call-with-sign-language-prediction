@@ -1,6 +1,7 @@
 import { Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '../types/webrtc.types';
+import AiIcon from '../assets/ai.svg?react';
 
 interface ChatPanelProps {
     messages: ChatMessage[];
@@ -14,6 +15,7 @@ export const ChatPanel = ({
     isChannelOpen
 }: ChatPanelProps) => {
     const [inputMessage, setInputMessage] = useState('');
+    const [isImproving, setIsImproving] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -24,6 +26,33 @@ export const ChatPanel = ({
         if (inputMessage.trim() && isChannelOpen) {
             onSendMessage(inputMessage);
             setInputMessage('');
+        }
+    };
+
+    const handleImproveText = async () => {
+        if (!inputMessage.trim() || isImproving) return;
+
+        setIsImproving(true);
+        try {
+            // Call your backend API here
+            const response = await fetch('/api/improve-text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: inputMessage }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setInputMessage(data.improvedText || inputMessage);
+            } else {
+                console.error('Failed to improve text');
+            }
+        } catch (error) {
+            console.error('Error improving text:', error);
+        } finally {
+            setIsImproving(false);
         }
     };
 
@@ -62,17 +91,16 @@ export const ChatPanel = ({
                             className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'} animate-fade-in`}
                         >
                             <div
-                                className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-md ${
-                                    msg.isOwn
-                                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm'
-                                        : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
-                                }`}
+                                className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-md ${msg.isOwn
+                                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm'
+                                    : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
+                                    }`}
                             >
                                 <p className="text-sm break-words leading-relaxed">{msg.text}</p>
                                 <span className={`text-xs mt-1 block ${msg.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                                    {new Date(msg.timestamp).toLocaleTimeString([], { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit' 
+                                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
                                     })}
                                 </span>
                             </div>
@@ -85,15 +113,34 @@ export const ChatPanel = ({
             {/* Input Area */}
             <div className="p-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
                 <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        placeholder={isChannelOpen ? "Type your message..." : "Waiting for connection..."}
-                        disabled={!isChannelOpen}
-                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
-                    />
+                    <div className="flex-1 relative">
+                        <input
+                            type="text"
+                            value={inputMessage}
+                            onChange={(e) => setInputMessage(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            placeholder={isChannelOpen ? "Type your message..." : "Waiting for connection..."}
+                            disabled={!isChannelOpen}
+                            className="w-full px-4 py-3 pr-14 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                        />
+                        {/* AI Improve Button */}
+                        {inputMessage.trim() && (
+                            <button
+                                onClick={handleImproveText}
+                                disabled={isImproving || !isChannelOpen}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-2 rounded-lg hover:shadow-lg disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all transform hover:scale-110 active:scale-95"
+                                title="Improve text with AI"
+                            >
+                                {isImproving ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                ) : (
+                                    <AiIcon className="h-7 w-7 text-white" />
+
+
+                                )}
+                            </button>
+                        )}
+                    </div>
                     <button
                         onClick={handleSend}
                         disabled={!inputMessage.trim() || !isChannelOpen}

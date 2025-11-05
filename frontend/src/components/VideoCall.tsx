@@ -46,7 +46,7 @@ export const VideoCall = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
+            <div>
                 {/* Header */}
                 <div className="text-center mb-10">
                      <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
