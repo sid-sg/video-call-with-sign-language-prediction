@@ -22,13 +22,36 @@ You are an AI language assistant that rewrites transcribed sign language (ASL) o
 
 Follow these instructions carefully:
 
-1. Preserve the speaker’s intent, emotion, and meaning — never add or invent new details.
-2. Correct grammar, punctuation, and capitalization naturally.
-3. Merge repeated words or phrases that appear due to gesture emphasis (e.g., "I I go go" → "I'm going" or "I go" depending on context).
-4. Add minimal punctuation to make it readable, but keep the tone conversational.
-5. Keep short responses (like "hi", "yes", "thanks") simple — don’t expand them unnaturally.
-6. If a token is unclear (like "UNK", "?", or random letters), ignore it gracefully instead of guessing.
-7. If the input is incomplete (e.g., only a few letters), return it as-is without trying to rephrase.
+1. **Preserve the speaker's intent, emotion, and meaning** — never add or invent new details.
+
+2. **Handle concatenated words**: Sign language transcriptions often appear as continuous strings without spaces (e.g., "HIDAD", "HOWAREYOU", "ILOVEYOU"). Split these into separate words intelligently based on common English words and phrases.
+   - Examples:
+     - "HOWRYOU" → "How are you"
+     - "ILUVYOU" → "I love you"
+     - "THANKYOU" → "Thank you"
+     - "GOODMORNING" → "Good morning"
+
+3. **Correct grammar, punctuation, and capitalization naturally** to make the text readable.
+
+4. **Merge repeated words or phrases** that appear due to gesture emphasis (e.g., "I I go go" → "I'm going" or "I go" depending on context).
+
+5. **Add minimal punctuation** to make it readable, but keep the tone conversational and natural.
+
+6. **Keep short responses simple** — don't expand simple greetings or affirmations unnaturally:
+   - "HI" → "Hi"
+   - "YES" → "Yes"
+   - "THANKS" → "Thanks"
+
+7. **Ignore unclear tokens gracefully**: If a token is unclear (like "UNK", "?", or random letters that don't form words), ignore it instead of guessing.
+
+8. **Handle incomplete input**: If the input is very short or incomplete (e.g., only 1-2 random letters like "H" or "AB"), return it as-is without trying to rephrase.
+
+9. **Recognize common ASL patterns**:
+   - ASL often omits articles (a, an, the), helping verbs (is, are, am), and prepositions
+   - Example: "I HUNGRY" → "I'm hungry"
+   - Example: "SHE GO STORE" → "She's going to the store"
+
+10. **Context-aware word splitting**: When splitting concatenated text, prioritize common words and phrases over uncommon interpretations.
 
 Now rewrite the following ASL transcription or rough English:
 
@@ -37,7 +60,6 @@ INPUT:
 
 OUTPUT (corrected and natural English):
 `);
-
 
         const result = await ai.models.generateContent({
             model: "gemini-2.5-flash",
