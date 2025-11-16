@@ -7,30 +7,43 @@ interface ChatPanelProps {
     messages: ChatMessage[];
     onSendMessage: (text: string) => void;
     isChannelOpen: boolean;
+    inputText: string;
+    onInputTextChange: (text: string) => void;
+    signAssistActive?: boolean;
 }
 
 export const ChatPanel = ({
     messages,
     onSendMessage,
-    isChannelOpen
+    isChannelOpen,
+    inputText,
+    onInputTextChange,
+    signAssistActive = false,
 }: ChatPanelProps) => {
-    const [inputMessage, setInputMessage] = useState('');
     const [isImproving, setIsImproving] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Keep input focused when sign assist is active
+    useEffect(() => {
+        if (signAssistActive && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [signAssistActive]);
+
     const handleSend = () => {
-        if (inputMessage.trim() && isChannelOpen) {
-            onSendMessage(inputMessage);
-            setInputMessage('');
+        if (inputText.trim() && isChannelOpen) {
+            onSendMessage(inputText);
+            onInputTextChange('');
         }
     };
 
     const handleImproveText = async () => {
-        if (!inputMessage.trim() || isImproving) return;
+        if (!inputText.trim() || isImproving) return;
 
         setIsImproving(true);
         try {
@@ -39,12 +52,13 @@ export const ChatPanel = ({
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text: inputMessage }),
+                body: JSON.stringify({ text: inputText }),
             });
 
             if (response.ok) {
                 const data = await response.json();
-                setInputMessage(data.improvedText || inputMessage);
+                const improved = data.improvedText || inputText;
+                onInputTextChange(improved);
             } else {
                 console.error('Failed to improve text');
             }
@@ -70,9 +84,16 @@ export const ChatPanel = ({
                     <div className="text-2xl">💬</div>
                     <h3 className="font-bold text-white text-lg">P2P Chat</h3>
                 </div>
-                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${isChannelOpen ? 'bg-green-400 text-green-900' : 'bg-red-400 text-red-900'}`}>
-                    {isChannelOpen ? '● Connected' : '○ Offline'}
-                </span>
+                <div className="flex items-center gap-2">
+                    {signAssistActive && (
+                        <span className="text-xs px-3 py-1 rounded-full bg-green-400 text-green-900 font-semibold">
+                            ✋ Sign Mode
+                        </span>
+                    )}
+                    <span className={`text-xs px-3 py-1 rounded-full font-semibold ${isChannelOpen ? 'bg-green-400 text-green-900' : 'bg-red-400 text-red-900'}`}>
+                        {isChannelOpen ? '● Connected' : '○ Offline'}
+                    </span>
+                </div>
             </div>
 
             {/* Messages Area */}
@@ -111,19 +132,32 @@ export const ChatPanel = ({
 
             {/* Input Area */}
             <div className="p-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
+                {signAssistActive && (
+                    <div className="mb-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                        <div className="flex items-center gap-2 text-green-700">
+                            <span className="text-lg">✋</span>
+                            <span className="text-xs font-semibold">Sign Assist Active - Letters will appear here as you sign</span>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex gap-2">
                     <div className="flex-1 relative">
                         <input
+                            ref={inputRef}
                             type="text"
-                            value={inputMessage}
-                            onChange={(e) => setInputMessage(e.target.value)}
+                            value={inputText}
+                            onChange={(e) => onInputTextChange(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder={isChannelOpen ? "Type your message..." : "Waiting for connection..."}
+                            placeholder={isChannelOpen ? (signAssistActive ? "Sign or type your message..." : "Type your message...") : "Waiting for connection..."}
                             disabled={!isChannelOpen}
-                            className="w-full px-4 py-3 pr-14 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
+                            className={`w-full px-4 py-3 pr-14 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${signAssistActive
+                                    ? 'border-green-300 focus:ring-green-500 focus:border-green-500 bg-green-50'
+                                    : 'border-gray-300 focus:ring-purple-500 focus:border-transparent'
+                                } disabled:bg-gray-100 disabled:cursor-not-allowed`}
                         />
                         {/* AI Improve Button */}
-                        {inputMessage.trim() && (
+                        {inputText.trim() && (
                             <button
                                 onClick={handleImproveText}
                                 disabled={isImproving || !isChannelOpen}
@@ -134,19 +168,24 @@ export const ChatPanel = ({
                                     <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                                 ) : (
                                     <AiIcon className="h-7 w-7 text-white" />
-
-
                                 )}
                             </button>
                         )}
                     </div>
                     <button
                         onClick={handleSend}
-                        disabled={!inputMessage.trim() || !isChannelOpen}
+                        disabled={!inputText.trim() || !isChannelOpen}
                         className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-xl hover:shadow-lg disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
                     >
                         <Send size={20} />
                     </button>
+                </div>
+
+                <div className="mt-2 text-xs text-gray-500 text-center">
+                    {signAssistActive
+                        ? '💡 Use sign language or keyboard - press Enter to send'
+                        : '💬 Type a message and press Enter to send'
+                    }
                 </div>
             </div>
         </div>

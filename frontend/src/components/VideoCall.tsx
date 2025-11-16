@@ -6,8 +6,9 @@ import { VideoPlayer } from './VideoPlayer';
 import { MediaControls } from './MediaControls';
 import { useDataChannel } from '../hooks/useDataChannel';
 import { ChatPanel } from './ChatPanel';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { useSignSentenceBuilder } from '../hooks/useSignSentenceBuilder';
 
 export const VideoCall = () => {
     const { socket, userId, isConnected: socketConnected } = useSocket();
@@ -25,6 +26,30 @@ export const VideoCall = () => {
     const [currentPrediction, setCurrentPrediction] = useState<{ label: string; confidence: number; inferenceTime: number } | null>(null);
     const [handDetected, setHandDetected] = useState(false);
     const [copied, setCopied] = useState(false);
+
+    // Chat input text state (shared between manual typing and sign detection)
+    const [chatInputText, setChatInputText] = useState('');
+
+    // Callback for sign detection to update chat input
+    const handleSignTextUpdate = useCallback((text: string) => {
+        setChatInputText(text);
+    }, []);
+
+    // Sign sentence builder
+    const {
+        currentLetter,
+        syncText,
+        getBufferStatus,
+    } = useSignSentenceBuilder({
+        prediction: currentPrediction,
+        handDetected,
+        enabled: signAssistEnabled,
+        onTextUpdate: handleSignTextUpdate,
+        confidenceThreshold: 0.8,
+        bufferSize: 8,
+        requiredStability: 6,
+        spacePauseMs: 600,
+    });
 
     const toggleSignAssist = () => {
         setSignAssistEnabled(!signAssistEnabled);
@@ -49,9 +74,9 @@ export const VideoCall = () => {
             <div>
                 {/* Header */}
                 <div className="text-center mb-10">
-                     <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                         🤟 Sign Language Video Call
-                     </h2>
+                    <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        🤟 Sign Language Video Call
+                    </h2>
                     <p className="text-gray-600 text-lg">Real-time AI-powered sign language detection</p>
                 </div>
 
@@ -89,7 +114,7 @@ export const VideoCall = () => {
                                 />
                             </div>
 
-                            {/* Sign Assist Panel */}
+                            {/* Sign Assist Panel - Simplified */}
                             {signAssistEnabled && (
                                 <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
                                     <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-4">
@@ -97,48 +122,76 @@ export const VideoCall = () => {
                                             <span className="text-3xl animate-pulse">✨</span>
                                             <div>
                                                 <p className="font-bold text-xl">Sign Assist Active</p>
-                                                <p className="text-green-100 text-sm">AI-powered hand detection enabled</p>
+                                                <p className="text-green-100 text-sm">Letters will appear in chat box as you sign</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="p-6">
-                                        {handDetected && currentPrediction ? (
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-6">
-                                                    <div className="bg-gradient-to-br from-green-400 to-emerald-500 text-white rounded-2xl p-8 shadow-xl">
-                                                        <div className="text-8xl font-black text-center">
-                                                            {currentPrediction.label}
-                                                        </div>
+                                        {/* Current Letter Detection */}
+                                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
+                                            <div className="text-sm text-gray-600 font-semibold mb-3">Current Detection</div>
+                                            {handDetected && currentLetter ? (
+                                                <div className="flex items-center gap-4">
+                                                    <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-6 shadow-lg">
+                                                        <div className="text-6xl font-black">{currentLetter}</div>
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">Prediction Details</div>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-bold">
-                                                                {(currentPrediction.confidence * 100).toFixed(1)}% Confidence
+                                                    <div className="flex-1">
+                                                        {currentPrediction && (
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm font-bold">
+                                                                        {(currentPrediction.confidence * 100).toFixed(1)}% Confidence
+                                                                    </div>
+                                                                    <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm font-semibold">
+                                                                        {currentPrediction.inferenceTime.toFixed(1)}ms
+                                                                    </div>
+                                                                </div>
+                                                                <div className="w-full">
+                                                                    <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
+                                                                        <div
+                                                                            className="bg-gradient-to-r from-purple-400 to-pink-400 h-full rounded-full transition-all duration-300"
+                                                                            style={{ width: `${currentPrediction.confidence * 100}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                            <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-semibold">
-                                                                {currentPrediction.inferenceTime.toFixed(1)}ms
+                                                        )}
+                                                        {/* Buffer Status */}
+                                                        {getBufferStatus() && (
+                                                            <div className="mt-3 flex gap-2 flex-wrap">
+                                                                {getBufferStatus()?.slice(0, 3).map(({ letter, count, percentage }) => (
+                                                                    <div key={letter} className="bg-white px-2 py-1 rounded text-xs font-mono border border-purple-200">
+                                                                        <span className="font-bold">{letter}</span>: {count}/8 ({percentage.toFixed(0)}%)
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        </div>
-                                                        <div className="w-64">
-                                                            <div className="bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
-                                                                <div
-                                                                    className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full transition-all duration-500 ease-out"
-                                                                    style={{ width: `${currentPrediction.confidence * 100}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 </div>
+                                            ) : (
+                                                <div className="text-center py-4">
+                                                    <div className="text-5xl mb-2 animate-pulse">👋</div>
+                                                    <p className="text-gray-500 text-sm">Show your hand to start signing</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Instructions */}
+                                        <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-200">
+                                            <div className="flex items-start gap-3">
+                                                <span className="text-2xl">💡</span>
+                                                <div className="text-sm text-gray-700 space-y-1">
+                                                    <p className="font-semibold text-blue-900">How to use:</p>
+                                                    <ul className="list-disc list-inside space-y-1 text-gray-600">
+                                                        <li>Sign letters - they'll appear in the chat input box</li>
+                                                        <li>Pause for 0.6s to add a space automatically</li>
+                                                        <li>Use keyboard Backspace to delete mistakes</li>
+                                                        <li>Press Enter or click Send when ready</li>
+                                                    </ul>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <div className="text-center py-8">
-                                                <div className="text-7xl mb-4 animate-pulse">👋</div>
-                                                <p className="text-gray-600 font-semibold text-lg">Show your hand to start detection</p>
-                                                <p className="text-gray-400 text-sm mt-2">Make sure your hand is visible to the camera</p>
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -203,6 +256,12 @@ export const VideoCall = () => {
                             messages={messages}
                             onSendMessage={sendMessage}
                             isChannelOpen={isChannelOpen}
+                            inputText={chatInputText}
+                            onInputTextChange={(text) => {
+                                setChatInputText(text);
+                                syncText(text); // Sync with sign detection
+                            }}
+                            signAssistActive={signAssistEnabled}
                         />
                     </div>
                 </div>
