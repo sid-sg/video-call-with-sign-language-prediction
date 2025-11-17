@@ -36,20 +36,13 @@ export const VideoCall = () => {
     }, []);
 
     // Sign sentence builder
-    const {
-        currentLetter,
-        syncText,
-        getBufferStatus,
-    } = useSignSentenceBuilder({
+    const { currentLetter, syncText, getBufferStatus } = useSignSentenceBuilder({
         prediction: currentPrediction,
         handDetected,
         enabled: signAssistEnabled,
         onTextUpdate: handleSignTextUpdate,
-        confidenceThreshold: 0.8,
-        bufferSize: 8,
-        requiredStability: 6,
-        spacePauseMs: 600,
     });
+
 
     const toggleSignAssist = () => {
         setSignAssistEnabled(!signAssistEnabled);
