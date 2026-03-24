@@ -63,7 +63,7 @@
 //     };
 // };
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { MediaControls } from '../types/webrtc.types';
 
 export const useMediaStream = () => {
@@ -72,7 +72,6 @@ export const useMediaStream = () => {
         video: true,
         audio: true,
     });
-    const localVideoRef = useRef<HTMLVideoElement | null>(null);
 
     // Acquire media stream on mount
     useEffect(() => {
