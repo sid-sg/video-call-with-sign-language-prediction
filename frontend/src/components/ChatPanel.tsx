@@ -28,7 +28,6 @@ export const ChatPanel = ({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Keep input focused when sign assist is active
     useEffect(() => {
         if (signAssistActive && inputRef.current) {
             inputRef.current.focus();
@@ -151,9 +150,9 @@ export const ChatPanel = ({
                             onKeyDown={handleKeyPress}
                             placeholder={isChannelOpen ? (signAssistActive ? "Sign or type your message..." : "Type your message...") : "Waiting for connection..."}
                             disabled={!isChannelOpen}
-                            className={`w-full px-4 py-3 pr-14 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${signAssistActive
+                            className={`w-full px-4 py-3 pr-14 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all text-gray-900 placeholder-gray-400 ${signAssistActive
                                     ? 'border-green-300 focus:ring-green-500 focus:border-green-500 bg-green-50'
-                                    : 'border-gray-300 focus:ring-purple-500 focus:border-transparent'
+                                    : 'border-gray-300 focus:ring-purple-500 focus:border-transparent bg-white'
                                 } disabled:bg-gray-100 disabled:cursor-not-allowed`}
                         />
                         {/* AI Improve Button */}

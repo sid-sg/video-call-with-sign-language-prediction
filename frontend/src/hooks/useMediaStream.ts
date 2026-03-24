@@ -108,14 +108,6 @@ export const useMediaStream = () => {
         };
     }, [localStream]);
 
-    // Re-attach srcObject whenever the video element or stream becomes available
-    // This fixes the race condition where the <video> element mounts
-    // after the stream is already acquired (e.g. room lobby → call view transition)
-    useEffect(() => {
-        if (localStream && localVideoRef.current) {
-            localVideoRef.current.srcObject = localStream;
-        }
-    });
 
     const toggleVideo = useCallback(() => {
         if (localStream) {
@@ -139,7 +131,6 @@ export const useMediaStream = () => {
 
     return {
         localStream,
-        localVideoRef,
         mediaControls,
         toggleVideo,
         toggleAudio,

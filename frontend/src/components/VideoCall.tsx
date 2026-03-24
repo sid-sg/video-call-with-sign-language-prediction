@@ -283,7 +283,7 @@ export const VideoCall = () => {
   } = useSocket();
 
   const { turnServers, isLoadingTurn } = useTurnServers();
-  const { localStream, localVideoRef, mediaControls, toggleVideo, toggleAudio } = useMediaStream();
+  const { localStream, mediaControls, toggleVideo, toggleAudio } = useMediaStream();
 
   const { remoteVideoRef, isConnected: peerConnected, dataChannel } =
     useWebRTC({
@@ -487,7 +487,7 @@ export const VideoCall = () => {
             <div className="flex-1 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <VideoPlayer
-                  videoRef={localVideoRef}
+                  stream={localStream} 
                   label="You"
                   muted
                   isVideoEnabled={mediaControls.video}
