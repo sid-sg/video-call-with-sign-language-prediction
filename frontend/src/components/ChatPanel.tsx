@@ -120,21 +120,29 @@ export const ChatPanel = ({
                     </div>
                 ) : (
                     messages.map((msg) => (
-                        <div key={msg.id} className="animate-fade-in">
-                            <div className="flex items-baseline gap-2 mb-0.5">
-                                <span className="text-xs font-medium text-foreground">
-                                    {msg.isOwn ? 'You' : 'Peer'}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                    })}
-                                </span>
-                            </div>
-                            <p className="text-sm text-foreground-90 leading-relaxed break-words">
+                        <div
+                            key={msg.id}
+                            className={`animate-fade-in flex flex-col ${
+                                msg.isOwn ? 'items-end' : 'items-start'
+                            }`}
+                        >
+                            <span className="text-xs text-muted-foreground mb-1 px-1">
+                                {msg.isOwn ? 'You' : 'Peer'}
+                                {' · '}
+                                {new Date(msg.timestamp).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                })}
+                            </span>
+                            <div
+                                className={`max-w-[85%] px-3.5 py-2 text-sm leading-relaxed break-words ${
+                                    msg.isOwn
+                                        ? 'bg-gmeet-blue text-white rounded-2xl rounded-br-sm'
+                                        : 'bg-secondary text-foreground rounded-2xl rounded-bl-sm'
+                                }`}
+                            >
                                 {msg.text}
-                            </p>
+                            </div>
                         </div>
                     ))
                 )}

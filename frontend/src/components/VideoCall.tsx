@@ -270,7 +270,7 @@ export const VideoCall = () => {
               <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
                 <VideoPlayer
                   videoRef={remoteVideoRef}
-                  label="Remote"
+                  label="Peer"
                   isVideoEnabled={true}
                 />
               </div>

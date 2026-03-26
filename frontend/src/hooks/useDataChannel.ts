@@ -9,6 +9,7 @@ interface UseDataChannelProps {
 export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isChannelOpen, setIsChannelOpen] = useState(false);
+    const [peerVideoEnabled, setPeerVideoEnabled] = useState(true);
 
     useEffect(() => {
         if (!dataChannel) {
@@ -35,6 +36,14 @@ export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => 
         dataChannel.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+
+                // Handle media-state messages (video on/off)
+                if (data.type === 'media-state') {
+                    setPeerVideoEnabled(data.videoEnabled ?? true);
+                    return;
+                }
+
+                // Handle chat messages
                 const chatMessage: ChatMessage = {
                     id: `${data.senderId}-${Date.now()}`,
                     text: data.text,
@@ -97,9 +106,23 @@ export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => 
         }
     }, [dataChannel, userId]);
 
+    const sendMediaState = useCallback((videoEnabled: boolean) => {
+        if (!dataChannel || dataChannel.readyState !== 'open') return;
+        try {
+            dataChannel.send(JSON.stringify({
+                type: 'media-state',
+                videoEnabled,
+            }));
+        } catch (error) {
+            console.error('Error sending media state:', error);
+        }
+    }, [dataChannel]);
+
     return {
         messages,
         sendMessage,
         isChannelOpen,
+        peerVideoEnabled,
+        sendMediaState,
     };
 };
