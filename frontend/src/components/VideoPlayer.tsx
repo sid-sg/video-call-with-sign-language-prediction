@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { User } from 'lucide-react';
 import { useSignLanguageDetection } from '../hooks/useSignLanguageDetection';
 
 interface VideoPlayerProps {
-    // For remote video: pass a ref so useWebRTC can assign srcObject externally
     videoRef?: React.RefObject<HTMLVideoElement | null>;
-    // For local video: pass the stream directly; we attach it via callback ref
     stream?: MediaStream | null;
     label: string;
     muted?: boolean;
@@ -30,18 +29,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [hasStream, setHasStream] = useState(false);
 
-    // Internal ref used when we own the video element (local stream via callback ref)
     const internalVideoRef = useRef<HTMLVideoElement | null>(null);
-
-    // The ref we actually read from — either the external one (remote) or our internal one (local)
     const activeRef = videoRef ?? internalVideoRef;
 
     const instanceId = isLocal ? 'local' : 'remote';
     const showSignAssist = isLocal && enableSignLanguage && isVideoEnabled;
 
-    // Callback ref: fires the instant the <video> element mounts in the DOM.
-    // This is the fix for the lobby→call transition race condition — no effect
-    // timing issues, no stale refs. Only used for local video (stream prop path).
+    // Callback ref for local video — fixes lobby→call race condition
     const callbackRef = useCallback((node: HTMLVideoElement | null) => {
         internalVideoRef.current = node;
         if (node && stream) {
@@ -49,7 +43,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
     }, [stream]);
 
-    // If the stream prop changes after mount (e.g. re-acquired), re-attach it
+    // Re-attach stream if it changes after mount
     useEffect(() => {
         if (!stream || !internalVideoRef.current) return;
         if (internalVideoRef.current.srcObject !== stream) {
@@ -57,7 +51,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
     }, [stream]);
 
-    // Detect stream availability (polls readyState so hasStream stays accurate)
+    // Detect stream availability
     useEffect(() => {
         const video = activeRef.current;
         if (!video) return;
@@ -113,30 +107,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const showCanvas = showSignAssist && hasStream && handsReady && modelReady;
 
     return (
-        <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl overflow-hidden shadow-2xl border-2 border-gray-700 aspect-video">
-            {/* Label Badge */}
-            <div className="absolute top-3 left-3 z-20">
-                <div className="bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl shadow-lg border border-white/20">
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold">{label}</span>
-                        {enableSignLanguage && isLocal && (
-                            <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
-                                {!hasStream
-                                    ? '⏸ No Stream'
-                                    : !modelReady
-                                        ? '⏳ Loading'
-                                        : !handsReady
-                                            ? '🔄 Init'
-                                            : '✨ Active'}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Video Element —
-                Local:  use callbackRef so srcObject is set at mount time (fixes race condition)
-                Remote: use the external videoRef so useWebRTC can assign srcObject to it */}
+        <div className="relative overflow-hidden rounded-lg bg-surface-video" style={{ minHeight: 0 }}>
+            {/* Video Element */}
             <video
                 ref={isLocal ? callbackRef : videoRef}
                 autoPlay
@@ -165,23 +137,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 }}
             />
 
-            {/* Placeholder */}
+            {/* Camera Off Placeholder — GMeet style */}
             {!isVideoEnabled && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-                    <div className="text-8xl mb-4 opacity-50">📹</div>
-                    <p className="text-gray-400 font-semibold">Camera Off</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-video">
+                    <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-3">
+                        <User size={40} className="text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium">{label}</p>
                 </div>
             )}
 
-            {/* Loading Overlay */}
+            {/* Loading */}
             {isVideoEnabled && !hasStream && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent mb-4 mx-auto"></div>
-                        <p className="text-gray-400">Connecting...</p>
+                <div className="absolute inset-0 flex items-center justify-center bg-surface-video">
+                    <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center animate-pulse">
+                        <User size={40} className="text-muted-foreground" />
                     </div>
                 </div>
             )}
+
+            {/* Name Label — bottom left like GMeet */}
+            <div className="absolute bottom-3 left-3 z-10">
+                <span className="bg-background-70 backdrop-blur-sm text-foreground text-xs font-medium px-3 py-1.5 rounded-md">
+                    {label}
+                    {enableSignLanguage && isLocal && (
+                        <span className="ml-2 opacity-70">
+                            {!hasStream
+                                ? '⏸'
+                                : !modelReady
+                                    ? '⏳'
+                                    : !handsReady
+                                        ? '🔄'
+                                        : '✨'}
+                        </span>
+                    )}
+                </span>
+            </div>
         </div>
     );
 };

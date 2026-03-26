@@ -6,8 +6,9 @@ import { VideoPlayer } from './VideoPlayer';
 import { MediaControls } from './MediaControls';
 import { useDataChannel } from '../hooks/useDataChannel';
 import { ChatPanel } from './ChatPanel';
+import { MeetSignAssistPanel } from './MeetSignAssistPanel';
 import { useState, useCallback } from 'react';
-import { Copy, Check, LogOut, Users, Plus, ArrowRight, Loader2 } from 'lucide-react';
+import { Copy, Check, LogOut, Users, Plus, Loader2, Shield, Clock, Video } from 'lucide-react';
 import { useSignSentenceBuilder } from '../hooks/useSignSentenceBuilder';
 
 export const VideoCall = () => {
@@ -34,6 +35,7 @@ export const VideoCall = () => {
   const [handDetected, setHandDetected] = useState(false);
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState('');
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Chat input text state
   const [chatInputText, setChatInputText] = useState('');
@@ -78,149 +80,203 @@ export const VideoCall = () => {
   const showCall = roomStatus === 'ready';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
-      {/* Header */}
-      <div className="text-center py-4 bg-black/20 backdrop-blur-sm border-b border-white/10">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-          🤟 Sign Language Video Call
-        </h2>
-        <p className="text-sm text-gray-400 mt-1">Real-time AI-powered sign language detection</p>
-      </div>
-
-      {/* Connection Status */}
-      <div className="flex justify-center gap-3 py-2">
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${socketConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-          {socketConnected ? '● Server Connected' : '○ Server Disconnected'}
-        </span>
-        {peerConnected && (
-          <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
-            ● Peer Connected
-          </span>
-        )}
-      </div>
-
-      {/* ======= LOBBY SCREEN ======= */}
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* ========= LOBBY ========= */}
       {showLobby && (
-        <div className="flex items-center justify-center min-h-[70vh]">
-          <div className="max-w-md w-full mx-4 space-y-6">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-500/20 mb-4">
-                <Users className="w-8 h-8 text-purple-400" />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-md animate-slide-up">
+            {/* Logo area */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gmeet-blue flex items-center justify-center">
+                  <Video size={22} className="text-primary-foreground" />
+                </div>
+                <h1 className="text-2xl font-medium text-foreground tracking-tight">
+                  SignCall
+                </h1>
               </div>
-              <h3 className="text-2xl font-bold">Join or Create a Room</h3>
-              <p className="text-gray-400">Share the room code with the person you want to call</p>
+              <p className="text-muted-foreground text-sm">
+                Video calling with real-time sign language detection
+              </p>
             </div>
 
-            {/* Create Room */}
-            <button
-              onClick={createRoom}
-              disabled={!socketConnected}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl font-semibold text-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Plus className="w-5 h-5" />
-              Create New Room
-            </button>
+            {/* Create Room Card */}
+            <div className="bg-card rounded-xl border border-border p-6 space-y-5">
+              {/* Connection status */}
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-gmeet-green' : 'bg-destructive'}`} />
+                <span className="text-xs text-muted-foreground">
+                  {socketConnected ? 'Server connected' : 'Connecting to server...'}
+                </span>
+              </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-white/20" />
-              <span className="text-gray-400 text-sm">or</span>
-              <div className="flex-1 h-px bg-white/20" />
-            </div>
-
-            {/* Join Room */}
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Enter room code (e.g. ABC123)"
-                value={joinInput}
-                onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
-                maxLength={6}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-center text-lg tracking-widest font-mono"
-              />
               <button
-                onClick={handleJoinRoom}
-                disabled={!socketConnected || !joinInput.trim()}
-                className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 disabled:bg-gray-800 disabled:cursor-not-allowed border border-white/20 rounded-xl font-semibold transition-all"
+                onClick={createRoom}
+                disabled={!socketConnected}
+                className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-gmeet-blue hover:bg-gmeet-blue-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-full text-primary-foreground font-medium transition-all active:scale-[0.98]"
               >
-                <ArrowRight className="w-5 h-5" />
-                Join Room
+                <Plus size={18} />
+                New meeting
               </button>
+
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-muted-foreground text-xs uppercase tracking-wider">
+                  or join
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter room code"
+                  value={joinInput}
+                  onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
+                  maxLength={6}
+                  className="flex-1 px-4 py-3 bg-secondary rounded-full text-foreground text-sm font-mono tracking-widest text-center focus:outline-none focus:ring-1 focus:ring-ring transition-all"
+                  style={{ color: 'hsl(var(--foreground))' }}
+                />
+                <button
+                  onClick={handleJoinRoom}
+                  disabled={!socketConnected || !joinInput.trim()}
+                  className="px-5 py-3 rounded-full text-gmeet-blue font-medium text-sm hover:bg-gmeet-blue-10 disabled:text-muted-foreground disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all"
+                >
+                  Join
+                </button>
+              </div>
+
+              {/* Error */}
+              {roomError && (
+                <div className="p-3 bg-destructive-10 border border-destructive rounded-lg text-destructive text-center text-sm">
+                  {roomError}
+                </div>
+              )}
             </div>
 
-            {/* Error */}
-            {roomError && (
-              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-center text-sm">
-                {roomError}
-              </div>
-            )}
+            {/* Features */}
+            <div className="mt-6 grid grid-cols-3 gap-3">
+              {[
+                { icon: Shield, label: 'Encrypted' },
+                { icon: Clock, label: 'Real-time' },
+                { icon: Users, label: '1-on-1' },
+              ].map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-2 py-3 rounded-lg bg-card-50 border border-border-50"
+                >
+                  <Icon size={18} className="text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ======= WAITING SCREEN ======= */}
+      {/* ========= WAITING ========= */}
       {showWaiting && (
-        <div className="flex items-center justify-center min-h-[70vh]">
-          <div className="max-w-md w-full mx-4 space-y-6 text-center">
-            <Loader2 className="w-12 h-12 text-purple-400 animate-spin mx-auto" />
-            <h3 className="text-2xl font-bold">Waiting for peer...</h3>
-            <p className="text-gray-400">Share this room code with the person you want to call</p>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center animate-slide-up space-y-6">
+            <Loader2
+              size={48}
+              className="text-gmeet-blue animate-spin mx-auto"
+            />
+            <div>
+              <h2 className="text-xl font-medium text-foreground mb-2">
+                Waiting for others to join
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Share this code with the person you want to call
+              </p>
+            </div>
 
-            {/* Room Code Display */}
+            {/* Room code */}
             {roomCode && (
               <div className="space-y-3">
-                <div
+                <button
                   onClick={copyRoomCode}
-                  className="inline-flex items-center gap-3 px-8 py-4 bg-white/10 border-2 border-dashed border-purple-500/50 rounded-2xl cursor-pointer hover:bg-white/15 transition-all group"
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-card border border-border rounded-xl hover:bg-secondary transition-all group"
                 >
-                  <span className="text-4xl font-mono font-bold tracking-[0.3em] text-purple-300">
+                  <span className="text-3xl font-mono font-bold tracking-[0.3em] text-foreground">
                     {roomCode}
                   </span>
                   {copied ? (
-                    <Check className="w-6 h-6 text-green-400" />
+                    <Check size={20} className="text-gmeet-green" />
                   ) : (
-                    <Copy className="w-6 h-6 text-gray-400 group-hover:text-white transition-colors" />
+                    <Copy
+                      size={20}
+                      className="text-muted-foreground group-hover:text-foreground transition-colors"
+                    />
                   )}
-                </div>
-                <p className="text-gray-500 text-sm">
-                  {copied ? '✅ Copied!' : 'Click to copy'}
+                </button>
+                <p className="text-xs text-muted-foreground">
+                  {copied ? 'Copied to clipboard' : 'Click to copy'}
                 </p>
               </div>
             )}
 
             <button
               onClick={leaveRoom}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-xl text-red-400 text-sm transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-destructive hover:bg-destructive-10 text-sm font-medium transition-all mx-auto"
             >
-              <LogOut className="w-4 h-4" />
-              Leave Room
+              <LogOut size={16} />
+              Leave
             </button>
           </div>
         </div>
       )}
 
-      {/* ======= CALL SCREEN ======= */}
+      {/* ========= CALL SCREEN ========= */}
       {showCall && (
-        <div className="p-4 space-y-4">
-          {/* Room Info Bar */}
-          <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-2">
+        <>
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0 z-10">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-400">Room:</span>
-              <span className="font-mono font-bold text-purple-300 tracking-wider">{roomCode}</span>
+              <div className="w-8 h-8 rounded-lg bg-gmeet-blue flex items-center justify-center">
+                <Video size={16} className="text-primary-foreground" />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-foreground">
+                  SignCall
+                </span>
+                <span className="text-xs text-muted-foreground ml-3">
+                  Room: {roomCode}
+                </span>
+              </div>
             </div>
-            <button
-              onClick={leaveRoom}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 text-sm transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-              Leave
-            </button>
+            <div className="flex items-center gap-3">
+              {peerConnected && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="w-2 h-2 rounded-full bg-gmeet-green" />
+                  Peer connected
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {new Date().toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Videos */}
-            <div className="flex-1 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Video Area + Chat */}
+          <div className="flex-1 flex min-h-0">
+            {/* Video Grid */}
+            <div className="flex-1 p-2 flex gap-2 min-h-0 relative">
+              {/* Remote video */}
+              <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+                <VideoPlayer
+                  videoRef={remoteVideoRef}
+                  label="Remote"
+                  isVideoEnabled={true}
+                />
+              </div>
+
+              {/* Local video */}
+              <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
                 <VideoPlayer
                   stream={localStream}
                   label="You"
@@ -230,90 +286,53 @@ export const VideoCall = () => {
                   enableSignLanguage={signAssistEnabled}
                   onPredictionChange={handlePredictionChange}
                 />
-                <VideoPlayer
-                  videoRef={remoteVideoRef}
-                  label="Remote"
-                  isVideoEnabled={true}
+                {/* Sign Assist overlay on local video */}
+                {signAssistEnabled && (
+                  <MeetSignAssistPanel
+                    handDetected={handDetected}
+                    currentLetter={currentLetter}
+                    currentPrediction={currentPrediction}
+                    bufferStatus={getBufferStatus()}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Chat Panel - slide out */}
+            {isChatOpen && (
+              <div className="w-80 flex-shrink-0 animate-fade-in">
+                <ChatPanel
+                  messages={messages}
+                  onSendMessage={sendMessage}
+                  isChannelOpen={isChannelOpen}
+                  inputText={chatInputText}
+                  onInputTextChange={(text) => {
+                    setChatInputText(text);
+                    syncText(text);
+                  }}
+                  signAssistActive={signAssistEnabled}
+                  onClose={() => setIsChatOpen(false)}
                 />
               </div>
+            )}
+          </div>
 
-              {/* Media Controls */}
+          {/* Bottom Control Bar */}
+          <div className="flex items-center justify-center py-4 flex-shrink-0">
+            <div className="bg-control-bar rounded-full px-6 py-2 border border-border" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.3)' }}>
               <MediaControls
                 controls={mediaControls}
                 onToggleVideo={toggleVideo}
                 onToggleAudio={toggleAudio}
+                onEndCall={leaveRoom}
                 signAssistEnabled={signAssistEnabled}
                 onToggleSignAssist={toggleSignAssist}
-                onEndCall={leaveRoom}
-              />
-
-              {/* Sign Assist Panel */}
-              {signAssistEnabled && (
-                <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span>✨</span>
-                    <span className="font-semibold text-purple-300">Sign Assist Active</span>
-                    <span className="text-xs text-gray-400">Letters will appear in chat box as you sign</span>
-                  </div>
-
-                  <div className="bg-black/20 rounded-lg p-3">
-                    <p className="text-xs text-gray-400 mb-2">Current Detection</p>
-                    {handDetected && currentLetter ? (
-                      <div className="flex items-center gap-4">
-                        <span className="text-4xl font-bold text-purple-300">{currentLetter}</span>
-                        {currentPrediction && (
-                          <div className="text-xs text-gray-400 space-y-1">
-                            <div>{(currentPrediction.confidence * 100).toFixed(1)}% Confidence</div>
-                            <div>{currentPrediction.inferenceTime.toFixed(1)}ms</div>
-                          </div>
-                        )}
-                        {getBufferStatus() && (
-                          <div className="flex gap-1">
-                            {getBufferStatus()?.slice(0, 3).map(({ letter, count, percentage }) => (
-                              <span key={letter} className="text-xs bg-white/10 px-2 py-0.5 rounded">
-                                {letter}: {count}/8 ({percentage.toFixed(0)}%)
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-2">
-                        <span className="text-2xl">👋</span>
-                        <p className="text-sm text-gray-400 mt-1">Show your hand to start signing</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>💡 <strong>How to use:</strong></p>
-                    <ul className="list-disc list-inside space-y-0.5 ml-4">
-                      <li>Sign letters – they'll appear in the chat input box</li>
-                      <li>Pause for 0.6s to add a space automatically</li>
-                      <li>Use keyboard Backspace to delete mistakes</li>
-                      <li>Press Enter or click Send when ready</li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Chat */}
-            <div className="w-full lg:w-96">
-              <ChatPanel
-                messages={messages}
-                onSendMessage={sendMessage}
-                isChannelOpen={isChannelOpen}
-                inputText={chatInputText}
-                onInputTextChange={(text) => {
-                  setChatInputText(text);
-                  syncText(text);
-                }}
-                signAssistActive={signAssistEnabled}
+                onToggleChat={() => setIsChatOpen(!isChatOpen)}
+                isChatOpen={isChatOpen}
               />
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

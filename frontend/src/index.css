@@ -1,20 +1,129 @@
 @import "tailwindcss";
 
+/* ── Google Meet–inspired dark theme tokens ── */
 @layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 0 0% 3.9%;
-    }
+  :root {
+    --background: 200 3% 13%;       /* #202124 */
+    --foreground: 0 0% 95%;         /* #f1f3f4 */
 
-    .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-    }
+    --card: 210 3% 17%;             /* #2a2b2e */
+    --card-foreground: 0 0% 95%;
+
+    --popover: 210 3% 17%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 214 82% 51%;         /* #1a73e8 Google Blue */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 3% 22%;        /* #37383b */
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 210 3% 20%;            /* #303134 */
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 214 82% 51%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 4 90% 58%;       /* #ea4335 Google Red */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 214 82% 51%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens */
+    --surface-elevated: 210 3% 20%;
+    --surface-video: 200 3% 10%;
+    --control-bar: 210 3% 17%;
+    --gmeet-green: 142 71% 45%;     /* #34a853 */
+    --gmeet-yellow: 43 96% 56%;     /* #fbbc04 */
+    --gmeet-red: 4 90% 58%;
+    --gmeet-blue: 214 82% 51%;
+  }
 }
 
-@layer base{
-    body {
-        background-color: hsl(var(--background));
-        color: hsl(var(--foreground));
-    }
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Roboto', 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* ── Semantic colour utilities (Tailwind v4 @utility) ── */
+@utility bg-background      { background-color: hsl(var(--background)); }
+@utility bg-foreground       { background-color: hsl(var(--foreground)); }
+@utility bg-card             { background-color: hsl(var(--card)); }
+@utility bg-secondary        { background-color: hsl(var(--secondary)); }
+@utility bg-muted            { background-color: hsl(var(--muted)); }
+@utility bg-destructive      { background-color: hsl(var(--destructive)); }
+@utility bg-surface-video    { background-color: hsl(var(--surface-video)); }
+@utility bg-control-bar      { background-color: hsl(var(--control-bar)); }
+@utility bg-gmeet-blue       { background-color: hsl(var(--gmeet-blue)); }
+@utility bg-gmeet-green      { background-color: hsl(var(--gmeet-green)); }
+@utility bg-gmeet-red        { background-color: hsl(var(--gmeet-red)); }
+
+@utility text-foreground           { color: hsl(var(--foreground)); }
+@utility text-muted-foreground     { color: hsl(var(--muted-foreground)); }
+@utility text-primary-foreground   { color: hsl(var(--primary-foreground)); }
+@utility text-destructive-foreground { color: hsl(var(--destructive-foreground)); }
+@utility text-destructive          { color: hsl(var(--destructive)); }
+@utility text-gmeet-green          { color: hsl(var(--gmeet-green)); }
+@utility text-gmeet-blue           { color: hsl(var(--gmeet-blue)); }
+
+@utility border-border       { border-color: hsl(var(--border)); }
+
+@utility ring-ring           { --tw-ring-color: hsl(var(--ring)); }
+
+/* Opacity variants via custom utilities */
+@utility bg-card-95         { background-color: hsl(var(--card) / 0.95); }
+@utility bg-background-70   { background-color: hsl(var(--background) / 0.7); }
+@utility bg-card-50         { background-color: hsl(var(--card) / 0.5); }
+@utility bg-secondary-80    { background-color: hsl(var(--secondary) / 0.8); }
+
+@utility bg-gmeet-blue-90   { background-color: hsl(var(--gmeet-blue) / 0.9); }
+@utility bg-gmeet-blue-10   { background-color: hsl(var(--gmeet-blue) / 0.1); }
+@utility bg-gmeet-green-90  { background-color: hsl(var(--gmeet-green) / 0.9); }
+@utility bg-gmeet-green-20  { background-color: hsl(var(--gmeet-green) / 0.2); }
+@utility bg-destructive-90  { background-color: hsl(var(--destructive) / 0.9); }
+@utility bg-destructive-10  { background-color: hsl(var(--destructive) / 0.1); }
+
+@utility text-foreground-90 { color: hsl(var(--foreground) / 0.9); }
+
+@utility border-border-50   { border-color: hsl(var(--border) / 0.5); }
+
+/* ── Animations ── */
+@utility animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@utility animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@utility animate-pulse-dot {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
 }

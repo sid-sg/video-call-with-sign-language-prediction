@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const BACKEND_SERVER = 'https://webrtc-video-calling-demo.onrender.com';
-// const BACKEND_SERVER = 'localhost:8080';
+// const BACKEND_SERVER = 'https://webrtc-video-calling-demo.onrender.com';
+const BACKEND_SERVER = 'localhost:8080';
 
 interface RoomReadyData {
   roomCode: string;

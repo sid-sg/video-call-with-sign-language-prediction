@@ -1,4 +1,4 @@
-import { Video, VideoOff, Mic, MicOff, Hand, PhoneOff } from 'lucide-react';
+import { Video, VideoOff, Mic, MicOff, Hand, PhoneOff, MessageSquare, MoreVertical } from 'lucide-react';
 import type { MediaControls as MediaControlsType } from '../types/webrtc.types';
 
 interface MediaControlsProps {
@@ -8,6 +8,8 @@ interface MediaControlsProps {
     onEndCall?: () => void;
     signAssistEnabled?: boolean;
     onToggleSignAssist?: () => void;
+    onToggleChat?: () => void;
+    isChatOpen?: boolean;
 }
 
 export const MediaControls = ({
@@ -16,57 +18,97 @@ export const MediaControls = ({
     onToggleAudio,
     onEndCall,
     signAssistEnabled = false,
-    onToggleSignAssist
+    onToggleSignAssist,
+    onToggleChat,
+    isChatOpen = false,
 }: MediaControlsProps) => {
     return (
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+            {/* Mic */}
             <button
-                onClick={onToggleVideo}
-                className={`p-3 rounded-full transition-colors ${controls.video
-                        ? 'bg-blue-500 hover:bg-blue-600'
-                        : 'bg-red-500 hover:bg-red-600'
-                    } text-white shadow-md`}
-                title={controls.video ? 'Turn off video' : 'Turn on video'}
+                onClick={onToggleAudio}
+                className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                    controls.audio
+                        ? 'bg-secondary hover:bg-secondary-80'
+                        : 'bg-destructive hover:bg-destructive-90'
+                }`}
+                title={controls.audio ? 'Mute' : 'Unmute'}
             >
-                {controls.video ? <Video size={20} /> : <VideoOff size={20} />}
+                {controls.audio ? (
+                    <Mic size={20} className="text-foreground" />
+                ) : (
+                    <MicOff size={20} className="text-destructive-foreground" />
+                )}
             </button>
 
+            {/* Camera */}
+            <button
+                onClick={onToggleVideo}
+                className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                    controls.video
+                        ? 'bg-secondary hover:bg-secondary-80'
+                        : 'bg-destructive hover:bg-destructive-90'
+                }`}
+                title={controls.video ? 'Turn off camera' : 'Turn on camera'}
+            >
+                {controls.video ? (
+                    <Video size={20} className="text-foreground" />
+                ) : (
+                    <VideoOff size={20} className="text-destructive-foreground" />
+                )}
+            </button>
 
+            {/* Sign Assist */}
             {onToggleSignAssist && (
                 <button
                     onClick={onToggleSignAssist}
-                    className={`p-3 rounded-full transition-colors ${signAssistEnabled
-                            ? 'bg-green-500 hover:bg-green-600'
-                            : 'bg-gray-400 hover:bg-gray-500'
-                        } text-white shadow-md`}
+                    className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                        signAssistEnabled
+                            ? 'bg-gmeet-green hover:bg-gmeet-green-90'
+                            : 'bg-secondary hover:bg-secondary-80'
+                    }`}
                     title={signAssistEnabled ? 'Disable Sign Assist' : 'Enable Sign Assist'}
                 >
-                    <Hand size={20} />
+                    <Hand size={20} className={signAssistEnabled ? 'text-primary-foreground' : 'text-foreground'} />
+                    {signAssistEnabled && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-gmeet-green rounded-full border-2 border-background animate-pulse-dot" />
+                    )}
                 </button>
             )}
 
+            {/* Chat */}
+            {onToggleChat && (
+                <button
+                    onClick={onToggleChat}
+                    className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                        isChatOpen
+                            ? 'bg-gmeet-blue hover:bg-gmeet-blue-90'
+                            : 'bg-secondary hover:bg-secondary-80'
+                    }`}
+                    title="Toggle chat"
+                >
+                    <MessageSquare size={20} className={isChatOpen ? 'text-primary-foreground' : 'text-foreground'} />
+                </button>
+            )}
+
+            {/* More options */}
             <button
-                onClick={onToggleAudio}
-                className={`p-3 rounded-full transition-colors ${controls.audio
-                        ? 'bg-blue-500 hover:bg-blue-600'
-                        : 'bg-red-500 hover:bg-red-600'
-                    } text-white shadow-md`}
-                title={controls.audio ? 'Mute' : 'Unmute'}
+                className="w-12 h-12 rounded-full flex items-center justify-center bg-secondary hover:bg-secondary-80 transition-all duration-200"
+                title="More options"
             >
-                {controls.audio ? <Mic size={20} /> : <MicOff size={20} />}
+                <MoreVertical size={20} className="text-foreground" />
             </button>
 
-            {/* End Call — visually separated from the toggle buttons */}
+            {/* End Call */}
             {onEndCall && (
                 <button
                     onClick={onEndCall}
-                    className="p-4 rounded-full bg-red-600 hover:bg-red-700 active:scale-95 text-white shadow-lg transition-all mx-2"
-                    title="End call"
+                    className="w-14 h-12 rounded-full bg-destructive hover:bg-destructive-90 flex items-center justify-center transition-all duration-200 ml-2"
+                    title="Leave call"
                 >
-                    <PhoneOff size={20} />
+                    <PhoneOff size={20} className="text-destructive-foreground" />
                 </button>
             )}
-
         </div>
     );
 };
