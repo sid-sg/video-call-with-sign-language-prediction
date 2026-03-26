@@ -107,7 +107,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const showCanvas = showSignAssist && hasStream && handsReady && modelReady;
 
     return (
-        <div className="relative overflow-hidden rounded-lg bg-surface-video" style={{ minHeight: 0 }}>
+        <div className="relative w-full h-full overflow-hidden rounded-lg bg-surface-video">
             {/* Video Element */}
             <video
                 ref={isLocal ? callbackRef : videoRef}
@@ -139,11 +139,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
             {/* Camera Off Placeholder — GMeet style */}
             {!isVideoEnabled && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-video">
-                    <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-3">
-                        <User size={40} className="text-muted-foreground" />
+                <div className="absolute inset-0 flex items-center justify-center bg-surface-video">
+                    <div
+                        className="rounded-full flex items-center justify-center"
+                        style={{
+                            width: 'clamp(64px, 15vw, 128px)',
+                            height: 'clamp(64px, 15vw, 128px)',
+                            background: isLocal
+                                ? 'linear-gradient(135deg, hsl(210 80% 55%), hsl(230 70% 50%))'
+                                : 'linear-gradient(135deg, hsl(340 70% 55%), hsl(20 80% 55%))',
+                        }}
+                    >
+                        <span
+                            className="text-white font-medium select-none"
+                            style={{ fontSize: 'clamp(28px, 6vw, 56px)' }}
+                        >
+                            {label.charAt(0).toUpperCase()}
+                        </span>
                     </div>
-                    <p className="text-muted-foreground text-sm font-medium">{label}</p>
                 </div>
             )}
 

@@ -7,7 +7,7 @@ import { MediaControls } from './MediaControls';
 import { useDataChannel } from '../hooks/useDataChannel';
 import { ChatPanel } from './ChatPanel';
 import { MeetSignAssistPanel } from './MeetSignAssistPanel';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Copy, Check, LogOut, Users, Plus, Loader2, Shield, Clock, Video } from 'lucide-react';
 import { useSignSentenceBuilder } from '../hooks/useSignSentenceBuilder';
 
@@ -27,7 +27,7 @@ export const VideoCall = () => {
       peerId, isInitiator, roomStatus,
     });
 
-  const { messages, sendMessage, isChannelOpen } = useDataChannel({ dataChannel, userId });
+  const { messages, sendMessage, isChannelOpen, peerVideoEnabled, sendMediaState } = useDataChannel({ dataChannel, userId });
 
   // Sign language detection toggle
   const [signAssistEnabled, setSignAssistEnabled] = useState(false);
@@ -54,6 +54,13 @@ export const VideoCall = () => {
   const toggleSignAssist = () => {
     setSignAssistEnabled(!signAssistEnabled);
   };
+
+  // Notify peer when local video state changes
+  useEffect(() => {
+    if (isChannelOpen) {
+      sendMediaState(mediaControls.video);
+    }
+  }, [mediaControls.video, isChannelOpen, sendMediaState]);
 
   const handlePredictionChange = (prediction: { label: string; confidence: number; inferenceTime: number } | null, detected: boolean) => {
     setCurrentPrediction(prediction);
@@ -271,7 +278,7 @@ export const VideoCall = () => {
                 <VideoPlayer
                   videoRef={remoteVideoRef}
                   label="Peer"
-                  isVideoEnabled={true}
+                  isVideoEnabled={peerVideoEnabled}
                 />
               </div>
 
