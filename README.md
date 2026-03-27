@@ -69,3 +69,14 @@ npm run dev
 ```
 
 The application should now be accessible in your web browser at the URL provided by the Vite server (typically `http://localhost:5173`).
+
+## Machine Learning Model
+
+The project includes a custom machine learning model for sign language detection. The training code and notebook are located in the `model` directory.
+
+If you want to modify, train, or use your own custom model in the frontend:
+1. Train or update the model using the resources in the `model` directory.
+2. Export the trained model to the ONNX format (e.g., `landmark_model.onnx`).
+3. Copy the exported `.onnx` model file alongside any matching class label files (like `landmark_classes.json`) into the `frontend/public/` directory. 
+
+The web application will then automatically load your ONNX model from the public directory directly into the Web Worker for real-time inference.
