@@ -2,6 +2,74 @@ import { useEffect, useRef, useState } from 'react';
 import * as ort from 'onnxruntime-web';
 import type { Results } from '@mediapipe/hands';
 
+// --- Globals for Preloading ---
+let globalSession: ort.InferenceSession | null = null;
+let globalLabels: string[] = [];
+let globalSessionPromise: Promise<void> | null = null;
+
+let globalHands: any | null = null;
+let globalHandsPromise: Promise<void> | null = null;
+
+export function preloadSignLanguageModels() {
+    if (!globalSessionPromise) {
+        globalSessionPromise = (async () => {
+            try {
+                console.log('[Preload] ⏳ Loading ONNX model...');
+                const session = await ort.InferenceSession.create('/landmark_model.onnx', {
+                    executionProviders: ['wasm'],
+                });
+
+                const labelResponse = await fetch('/landmark_classes.json');
+                const labelText = await labelResponse.text();
+                let labels: string[] = [];
+                try {
+                    const labelData = JSON.parse(labelText);
+                    if (Array.isArray(labelData)) {
+                        labels = labelData;
+                    } else if (typeof labelData === 'object') {
+                        const entries = Object.entries(labelData) as [string, number][];
+                        labels = new Array(entries.length);
+                        entries.forEach(([label, index]) => {
+                            labels[index] = label;
+                        });
+                    }
+                } catch (e) {
+                    console.error('[Preload] ❌ Failed to parse labels JSON:', e);
+                }
+
+                globalSession = session;
+                globalLabels = labels;
+                console.log(`[Preload] ✅ ONNX model ready with ${labels.length} classes`);
+            } catch (err) {
+                console.error('[Preload] ❌ ONNX load error', err);
+            }
+        })();
+    }
+
+    if (!globalHandsPromise) {
+        globalHandsPromise = (async () => {
+            try {
+                console.log('[Preload] ⏳ Loading MediaPipe Hands...');
+                const { Hands } = await import('@mediapipe/hands');
+                const hands = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+                });
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.7,
+                    minTrackingConfidence: 0.5,
+                });
+                await hands.initialize();
+                globalHands = hands;
+                console.log('[Preload] ✅ MediaPipe Hands ready');
+            } catch (err) {
+                console.error('[Preload] ❌ Hands preload error', err);
+            }
+        })();
+    }
+}
+
 interface DetectionOptions {
     videoElement: HTMLVideoElement | null;
     canvasElement: HTMLCanvasElement | null;
@@ -44,53 +112,35 @@ export function useSignLanguageDetection({
 
     /** ---- Load ONNX model ---- */
     useEffect(() => {
-        async function loadModel() {
-            try {
-                console.log(`[${instanceId}] ⏳ Loading ONNX model...`);
-                const session = await ort.InferenceSession.create('/landmark_model.onnx', {
-                    executionProviders: ['wasm'],
-                });
-
-                const labelResponse = await fetch('/landmark_classes.json');
-                const labelText = await labelResponse.text();
-                console.log(`[${instanceId}] 📄 Label file content:`, labelText);
-
-                let labels: string[] = [];
-                try {
-                    const labelData = JSON.parse(labelText);
-                    console.log(`[${instanceId}] 📋 Parsed label data:`, labelData);
-
-                    // Check if it's a dictionary {"A": 0, "B": 1} or array ["A", "B"]
-                    if (Array.isArray(labelData)) {
-                        labels = labelData;
-                    } else if (typeof labelData === 'object') {
-                        // Convert {"A": 0, "B": 1} to ["A", "B"]
-                        const entries = Object.entries(labelData) as [string, number][];
-                        labels = new Array(entries.length);
-                        entries.forEach(([label, index]) => {
-                            labels[index] = label;
-                        });
-                    }
-                    console.log(`[${instanceId}] 📋 Final label array:`, labels);
-                } catch (e) {
-                    console.error(`[${instanceId}] ❌ Failed to parse labels JSON:`, e);
-                }
-
-                // Log model info
-                console.log(`[${instanceId}] 📋 Model inputs:`, session.inputNames);
-                console.log(`[${instanceId}] 📋 Model outputs:`, session.outputNames);
-
-                sessionRef.current = session;
-                labelsRef.current = labels;
+        let isMounted = true;
+        async function waitModel() {
+            // Check if already loaded globally
+            if (globalSession && globalLabels.length > 0) {
+                sessionRef.current = globalSession;
+                labelsRef.current = globalLabels;
+                if (isMounted) setModelReady(true);
+                return;
+            }
+            
+            // Initiate preload if not already started
+            if (!globalSessionPromise) {
+                preloadSignLanguageModels();
+            }
+            
+            if (globalSessionPromise) {
+                await globalSessionPromise;
+            }
+            
+            if (isMounted && globalSession) {
+                sessionRef.current = globalSession;
+                labelsRef.current = globalLabels;
                 setModelReady(true);
-                console.log(`[${instanceId}] ✅ ONNX model ready with ${labels.length} classes`);
-            } catch (err) {
-                console.error(`[${instanceId}] ❌ ONNX load error`, err);
             }
         }
-        loadModel();
+        waitModel();
 
         return () => {
+            isMounted = false;
             sessionRef.current = null;
         };
     }, [instanceId]);
@@ -112,20 +162,23 @@ export function useSignLanguageDetection({
 
         async function initHands() {
             try {
-                const { Hands, HAND_CONNECTIONS } = await import('@mediapipe/hands');
+                if (!globalHandsPromise) {
+                    preloadSignLanguageModels();
+                }
+
+                if (globalHandsPromise) {
+                    await globalHandsPromise;
+                }
 
                 if (!isMounted) return;
 
-                const hands = new Hands({
-                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-                });
+                const { HAND_CONNECTIONS } = await import('@mediapipe/hands');
+                const hands = globalHands;
 
-                hands.setOptions({
-                    maxNumHands: 1,
-                    modelComplexity: 1,
-                    minDetectionConfidence: 0.7,
-                    minTrackingConfidence: 0.5,
-                });
+                if (!hands) {
+                    console.error(`[${instanceId}] ❌ Global Hands instance is null after preload`);
+                    return;
+                }
 
                 hands.onResults(async (results: Results) => {
                     const canvas = canvasElementRef.current;
@@ -200,7 +253,6 @@ export function useSignLanguageDetection({
                 });
 
                 if (!isMounted) {
-                    hands.close();
                     return;
                 }
 
@@ -216,6 +268,9 @@ export function useSignLanguageDetection({
 
         return () => {
             isMounted = false;
+            if (globalHands) {
+                globalHands.onResults(() => {}); // Remove callback
+            }
             console.log(`[${instanceId}] 🧹 Cleaning up Hands init effect`);
         };
     }, [enabled, modelReady, instanceId]);
@@ -360,8 +415,8 @@ export function useSignLanguageDetection({
     useEffect(() => {
         return () => {
             if (handsRef.current) {
-                console.log(`[${instanceId}] 🧹 Cleaning up MediaPipe Hands`);
-                handsRef.current.close();
+                console.log(`[${instanceId}] 🧹 Clearing MediaPipe Hands ref`);
+                // We do NOT call .close() on the global hands reference
                 handsRef.current = null;
                 setHandsReady(false);
             }
