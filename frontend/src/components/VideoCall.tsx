@@ -189,12 +189,12 @@ export const VideoCall = () => {
 
   // ─── Presentation layout (screen share active) ───
   const renderPresentationLayout = () => (
-    <div className="flex-1 p-2 flex gap-2 min-h-0 relative">
-      {/* Sidebar — webcam tiles stacked vertically on the left */}
-      <div className="flex flex-col gap-2 flex-shrink-0" style={{ width: '280px', minWidth: '200px' }}>
+    <div className="flex-1 p-2 flex flex-col md:flex-row gap-2 min-h-0 relative">
+      {/* Sidebar — webcam tiles stacked vertically on md, horizontally on mobile */}
+      <div className="flex flex-row md:flex-col gap-2 flex-shrink-0 md:w-[280px] md:min-w-[200px] h-32 md:h-auto overflow-x-auto md:overflow-visible">
 
         {/* Remote webcam */}
-        <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+        <div className="flex-1 min-w-[120px] md:min-w-0 relative rounded-lg overflow-hidden bg-surface-video">
           <VideoPlayer
             stream={remoteStream}
             label="Peer"
@@ -204,7 +204,7 @@ export const VideoCall = () => {
         </div>
 
         {/* Local webcam */}
-        <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+        <div className="flex-1 min-w-[120px] md:min-w-0 relative rounded-lg overflow-hidden bg-surface-video">
           <VideoPlayer
             stream={localStream}
             label="You"
@@ -276,7 +276,7 @@ export const VideoCall = () => {
 
   // ─── Normal layout (no screen share) ───
   const renderNormalLayout = () => (
-    <div className="flex-1 p-2 flex gap-2 min-h-0 relative">
+    <div className="flex-1 p-2 flex flex-col md:flex-row gap-2 min-h-0 relative">
       {/* Remote video */}
       <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
         <VideoPlayer
@@ -490,13 +490,13 @@ export const VideoCall = () => {
           </div>
 
           {/* Video Area + Chat */}
-          <div className="flex-1 flex min-h-0">
+          <div className="flex-1 flex flex-col md:flex-row min-h-0">
             {/* Dynamic layout based on screen sharing */}
             {anyScreenSharing ? renderPresentationLayout() : renderNormalLayout()}
 
             {/* Chat Panel - slide out */}
             {isChatOpen && (
-              <div className="w-80 flex-shrink-0 animate-fade-in">
+              <div className="w-full md:w-80 flex-shrink-0 animate-fade-in h-[50vh] md:h-auto border-t md:border-t-0 md:border-l border-border mt-2 md:mt-0">
                 <ChatPanel
                   messages={messages}
                   onSendMessage={sendMessage}
