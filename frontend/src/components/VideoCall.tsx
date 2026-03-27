@@ -9,7 +9,7 @@ import { useDataChannel } from '../hooks/useDataChannel';
 import { ChatPanel } from './ChatPanel';
 import { MeetSignAssistPanel } from './MeetSignAssistPanel';
 import { useState, useCallback, useEffect } from 'react';
-import { Copy, Check, LogOut, Users, Plus, Loader2, Shield, Clock, Video, Minimize2, X, AlertCircle } from 'lucide-react';
+import { Copy, Check, LogOut, Plus, Loader2, Video, Minimize2, X, AlertCircle } from 'lucide-react';
 import { useSignSentenceBuilder } from '../hooks/useSignSentenceBuilder';
 
 type MaximizedVideo = 'local' | 'remote' | 'screen' | null;
@@ -391,22 +391,6 @@ export const VideoCall = () => {
               )}
             </div>
 
-            {/* Features */}
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              {[
-                { icon: Shield, label: 'Encrypted' },
-                { icon: Clock, label: 'Real-time' },
-                { icon: Users, label: '1-on-1' },
-              ].map(({ icon: Icon, label }) => (
-                <div
-                  key={label}
-                  className="flex flex-col items-center gap-2 py-3 rounded-lg bg-card-50 border border-border-50"
-                >
-                  <Icon size={18} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">{label}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       )}
