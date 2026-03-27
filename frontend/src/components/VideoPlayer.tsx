@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { User } from 'lucide-react';
+import { User, Maximize2 } from 'lucide-react';
 import { useSignLanguageDetection } from '../hooks/useSignLanguageDetection';
 
 interface VideoPlayerProps {
-    videoRef?: React.RefObject<HTMLVideoElement | null>;
     stream?: MediaStream | null;
     label: string;
     muted?: boolean;
@@ -14,10 +13,13 @@ interface VideoPlayerProps {
         prediction: { label: string; confidence: number; inferenceTime: number } | null,
         detectedHand: boolean
     ) => void;
+    /** If true, use object-fit: contain (for screen shares) */
+    isScreenShare?: boolean;
+    /** Maximize callback — shown on hover */
+    onMaximize?: () => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
-    videoRef,
     stream,
     label,
     muted = false,
@@ -25,17 +27,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     isLocal = false,
     enableSignLanguage = false,
     onPredictionChange,
+    isScreenShare = false,
+    onMaximize,
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [hasStream, setHasStream] = useState(false);
 
     const internalVideoRef = useRef<HTMLVideoElement | null>(null);
-    const activeRef = videoRef ?? internalVideoRef;
+    const activeRef = internalVideoRef;
 
     const instanceId = isLocal ? 'local' : 'remote';
     const showSignAssist = isLocal && enableSignLanguage && isVideoEnabled;
 
-    // Callback ref for local video — fixes lobby→call race condition
+    // Callback ref — sets srcObject whenever the DOM node mounts/remounts
+    // or when the stream changes. Fixes layout-switch srcObject loss.
     const callbackRef = useCallback((node: HTMLVideoElement | null) => {
         internalVideoRef.current = node;
         if (node && stream) {
@@ -106,11 +111,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const showCanvas = showSignAssist && hasStream && handsReady && modelReady;
 
+    // Determine object-fit: screen shares should use 'contain' to show full content
+    const objectFit = isScreenShare ? 'contain' : 'cover';
+    // Don't mirror screen shares or remote video
+    const shouldMirror = isLocal && !isScreenShare;
+
     return (
-        <div className="relative w-full h-full overflow-hidden rounded-lg bg-surface-video">
+        <div className="video-tile relative w-full h-full overflow-hidden rounded-lg bg-surface-video">
             {/* Video Element */}
             <video
-                ref={isLocal ? callbackRef : videoRef}
+                ref={callbackRef}
                 autoPlay
                 playsInline
                 muted={muted}
@@ -118,8 +128,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     display: !showCanvas && isVideoEnabled ? 'block' : 'none',
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
-                    transform: isLocal ? 'scaleX(-1)' : 'none',
+                    objectFit,
+                    transform: shouldMirror ? 'scaleX(-1)' : 'none',
                 }}
             />
 
@@ -132,8 +142,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     display: showCanvas ? 'block' : 'none',
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
-                    transform: isLocal ? 'scaleX(-1)' : 'none',
+                    objectFit,
+                    transform: shouldMirror ? 'scaleX(-1)' : 'none',
                 }}
             />
 
@@ -186,6 +196,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     )}
                 </span>
             </div>
+
+            {/* Maximize button — top right, visible on hover */}
+            {onMaximize && (
+                <button
+                    onClick={onMaximize}
+                    className="maximize-btn absolute top-3 right-3 z-10 w-8 h-8 rounded-md bg-background-70 backdrop-blur-sm flex items-center justify-center hover:bg-secondary transition-all duration-200"
+                    title="Maximize"
+                >
+                    <Maximize2 size={16} className="text-foreground" />
+                </button>
+            )}
         </div>
     );
 };

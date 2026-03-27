@@ -1,15 +1,21 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ChatMessage } from '../types/webrtc.types';
 
 interface UseDataChannelProps {
     dataChannel: RTCDataChannel | null;
     userId: string | null;
+    onScreenShareChange?: (peerIsSharing: boolean) => void;
 }
 
-export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => {
+export const useDataChannel = ({ dataChannel, userId, onScreenShareChange }: UseDataChannelProps) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isChannelOpen, setIsChannelOpen] = useState(false);
     const [peerVideoEnabled, setPeerVideoEnabled] = useState(true);
+
+    // Keep a stable ref for the callback so that the onmessage handler
+    // doesn't need to be re-attached every time the callback reference changes.
+    const screenShareCbRef = useRef(onScreenShareChange);
+    useEffect(() => { screenShareCbRef.current = onScreenShareChange; }, [onScreenShareChange]);
 
     useEffect(() => {
         if (!dataChannel) {
@@ -40,6 +46,16 @@ export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => 
                 // Handle media-state messages (video on/off)
                 if (data.type === 'media-state') {
                     setPeerVideoEnabled(data.videoEnabled ?? true);
+                    return;
+                }
+
+                // Handle screen-share messages
+                if (data.type === 'screen-share-started') {
+                    screenShareCbRef.current?.(true);
+                    return;
+                }
+                if (data.type === 'screen-share-stopped') {
+                    screenShareCbRef.current?.(false);
                     return;
                 }
 
@@ -83,7 +99,6 @@ export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => 
             return;
         }
 
-        // ... (rest of sendMessage is unchanged) ...
         const message = {
             text,
             senderId: userId,
@@ -118,11 +133,23 @@ export const useDataChannel = ({ dataChannel, userId }: UseDataChannelProps) => 
         }
     }, [dataChannel]);
 
+    const sendScreenShareState = useCallback((isSharing: boolean) => {
+        if (!dataChannel || dataChannel.readyState !== 'open') return;
+        try {
+            dataChannel.send(JSON.stringify({
+                type: isSharing ? 'screen-share-started' : 'screen-share-stopped',
+            }));
+        } catch (error) {
+            console.error('Error sending screen share state:', error);
+        }
+    }, [dataChannel]);
+
     return {
         messages,
         sendMessage,
         isChannelOpen,
         peerVideoEnabled,
         sendMediaState,
+        sendScreenShareState,
     };
 };

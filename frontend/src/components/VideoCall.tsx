@@ -2,14 +2,17 @@ import { useSocket } from '../hooks/useSocket';
 import { useTurnServers } from '../hooks/useTurnServers';
 import { useMediaStream } from '../hooks/useMediaStream';
 import { useWebRTC } from '../hooks/useWebRTC';
+import { useScreenShare } from '../hooks/useScreenShare';
 import { VideoPlayer } from './VideoPlayer';
 import { MediaControls } from './MediaControls';
 import { useDataChannel } from '../hooks/useDataChannel';
 import { ChatPanel } from './ChatPanel';
 import { MeetSignAssistPanel } from './MeetSignAssistPanel';
 import { useState, useCallback, useEffect } from 'react';
-import { Copy, Check, LogOut, Users, Plus, Loader2, Shield, Clock, Video } from 'lucide-react';
+import { Copy, Check, LogOut, Users, Plus, Loader2, Shield, Clock, Video, Minimize2, X, AlertCircle } from 'lucide-react';
 import { useSignSentenceBuilder } from '../hooks/useSignSentenceBuilder';
+
+type MaximizedVideo = 'local' | 'remote' | 'screen' | null;
 
 export const VideoCall = () => {
   const {
@@ -19,15 +22,43 @@ export const VideoCall = () => {
   } = useSocket();
 
   const { turnServers, isLoadingTurn } = useTurnServers();
-  const { localStream, mediaControls, toggleVideo, toggleAudio } = useMediaStream();
+  const { localStream, mediaControls, toggleVideo, toggleAudio, micError, dismissMicError } = useMediaStream();
 
-  const { remoteVideoRef, isConnected: peerConnected, dataChannel } =
+  const { remoteStream, remoteScreenStream, isConnected: peerConnected, dataChannel, peerConnection, hasRemoteScreen, renegotiate } =
     useWebRTC({
       socket, userId, turnServers, localStream, isLoadingTurn,
       peerId, isInitiator, roomStatus,
     });
 
-  const { messages, sendMessage, isChannelOpen, peerVideoEnabled, sendMediaState } = useDataChannel({ dataChannel, userId });
+  // Screen share — needs handlePeerScreenShareChange as data channel callback
+  // We'll set up the data channel with a callback, then pass it to screen share
+  const [peerScreenSharing, setPeerScreenSharing] = useState(false);
+
+  const handlePeerScreenShareCb = useCallback((sharing: boolean) => {
+    setPeerScreenSharing(sharing);
+  }, []);
+
+  const { messages, sendMessage, isChannelOpen, peerVideoEnabled, sendMediaState, sendScreenShareState } =
+    useDataChannel({ dataChannel, userId, onScreenShareChange: handlePeerScreenShareCb });
+
+  const {
+    isSharing: isScreenSharing,
+    peerIsSharing,
+    startScreenShare,
+    stopScreenShare,
+    handlePeerScreenShareChange,
+  } = useScreenShare({
+    peerConnection,
+    sendScreenShareState,
+    renegotiate,
+  });
+
+  // Sync the data channel callback to the screen share hook
+  useEffect(() => {
+    if (peerScreenSharing !== undefined) {
+      handlePeerScreenShareChange(peerScreenSharing);
+    }
+  }, [peerScreenSharing, handlePeerScreenShareChange]);
 
   // Sign language detection toggle
   const [signAssistEnabled, setSignAssistEnabled] = useState(false);
@@ -36,6 +67,7 @@ export const VideoCall = () => {
   const [copied, setCopied] = useState(false);
   const [joinInput, setJoinInput] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [maximizedVideo, setMaximizedVideo] = useState<MaximizedVideo>(null);
 
   // Chat input text state
   const [chatInputText, setChatInputText] = useState('');
@@ -52,7 +84,9 @@ export const VideoCall = () => {
   });
 
   const toggleSignAssist = () => {
-    setSignAssistEnabled(!signAssistEnabled);
+    const nextState = !signAssistEnabled;
+    setSignAssistEnabled(nextState);
+    setIsChatOpen(nextState);
   };
 
   // Notify peer when local video state changes
@@ -81,13 +115,208 @@ export const VideoCall = () => {
     }
   };
 
+  // Is anyone sharing their screen?
+  const anyScreenSharing = isScreenSharing || peerIsSharing;
+
   // Show lobby if not in a room or waiting
   const showLobby = roomStatus === 'idle' || roomStatus === 'error';
   const showWaiting = roomStatus === 'waiting';
   const showCall = roomStatus === 'ready';
 
+  // ─── Maximize overlay ───
+  const renderMaximizedOverlay = () => {
+    if (!maximizedVideo) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex items-center justify-center animate-maximize-in">
+        {/* Minimize button */}
+        <button
+          onClick={() => setMaximizedVideo(null)}
+          className="absolute top-4 right-4 z-50 w-10 h-10 rounded-lg bg-secondary hover:bg-secondary-80 flex items-center justify-center transition-all duration-200"
+          title="Minimize"
+        >
+          <Minimize2 size={20} className="text-foreground" />
+        </button>
+
+        {/* Label */}
+        <div className="absolute top-4 left-4 z-50">
+          <span className="bg-background-70 backdrop-blur-sm text-foreground text-sm font-medium px-4 py-2 rounded-lg">
+            {maximizedVideo === 'local' ? 'You' : maximizedVideo === 'remote' ? 'Peer' : 'Screen Share'}
+          </span>
+        </div>
+
+        <div className="w-full h-full">
+          {maximizedVideo === 'local' && (
+            <VideoPlayer
+              stream={localStream}
+              label="You"
+              muted
+              isVideoEnabled={mediaControls.video}
+              isLocal={true}
+              enableSignLanguage={signAssistEnabled}
+              onPredictionChange={handlePredictionChange}
+            />
+          )}
+          {maximizedVideo === 'remote' && (
+            <VideoPlayer
+              stream={remoteStream}
+              label="Peer"
+              isVideoEnabled={peerVideoEnabled}
+            />
+          )}
+          {maximizedVideo === 'screen' && (
+            isScreenSharing ? (
+              <VideoPlayer
+                stream={localStream}
+                label="Your Screen"
+                muted
+                isVideoEnabled={true}
+                isScreenShare={true}
+              />
+            ) : (
+              <VideoPlayer
+                stream={remoteScreenStream}
+                label="Peer's Screen"
+                isVideoEnabled={true}
+                isScreenShare={true}
+              />
+            )
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Presentation layout (screen share active) ───
+  const renderPresentationLayout = () => (
+    <div className="flex-1 p-2 flex gap-2 min-h-0 relative">
+      {/* Sidebar — webcam tiles stacked vertically on the left */}
+      <div className="flex flex-col gap-2 flex-shrink-0" style={{ width: '280px', minWidth: '200px' }}>
+
+        {/* Remote webcam */}
+        <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+          <VideoPlayer
+            stream={remoteStream}
+            label="Peer"
+            isVideoEnabled={peerVideoEnabled}
+            onMaximize={() => setMaximizedVideo('remote')}
+          />
+        </div>
+
+        {/* Local webcam */}
+        <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+          <VideoPlayer
+            stream={localStream}
+            label="You"
+            muted
+            isVideoEnabled={mediaControls.video}
+            isLocal={true}
+            enableSignLanguage={signAssistEnabled}
+            onPredictionChange={handlePredictionChange}
+            onMaximize={() => setMaximizedVideo('local')}
+          />
+          {signAssistEnabled && (
+            <MeetSignAssistPanel
+              handDetected={handDetected}
+              currentLetter={currentLetter}
+              currentPrediction={currentPrediction}
+              bufferStatus={getBufferStatus()}
+            />
+          )}
+        </div>
+
+      </div>
+
+      {/* Main area — shared screen (big) */}
+      <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+        {isScreenSharing ? (
+          // Local screen share — show a preview
+          <div className="w-full h-full flex items-center justify-center bg-surface-video relative">
+            <div className="text-center">
+              <MonitorUpIcon />
+              <p className="text-foreground text-lg font-medium mt-4">You are presenting</p>
+              <p className="text-muted-foreground text-sm mt-1">Your screen is being shared with the call</p>
+              <button
+                onClick={stopScreenShare}
+                className="mt-4 px-5 py-2.5 bg-destructive hover:bg-destructive-90 rounded-full text-destructive-foreground text-sm font-medium transition-all active:scale-[0.98]"
+              >
+                Stop presenting
+              </button>
+            </div>
+            {/* Maximize for the shared screen */}
+            <button
+              onClick={() => setMaximizedVideo('screen')}
+              className="maximize-btn absolute top-3 right-3 z-10 w-8 h-8 rounded-md bg-background-70 backdrop-blur-sm flex items-center justify-center hover:bg-secondary transition-all duration-200 opacity-0 hover:opacity-100"
+              title="Maximize"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-foreground">
+                <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            </button>
+          </div>
+        ) : peerIsSharing && hasRemoteScreen ? (
+          // Peer's screen share
+          <VideoPlayer
+            stream={remoteScreenStream}
+            label="Peer's Screen"
+            isVideoEnabled={true}
+            isScreenShare={true}
+            onMaximize={() => setMaximizedVideo('screen')}
+          />
+        ) : (
+          // Fallback — shouldn't happen if anyScreenSharing is correct
+          <div className="w-full h-full flex items-center justify-center">
+            <p className="text-muted-foreground">Waiting for screen share...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ─── Normal layout (no screen share) ───
+  const renderNormalLayout = () => (
+    <div className="flex-1 p-2 flex gap-2 min-h-0 relative">
+      {/* Remote video */}
+      <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+        <VideoPlayer
+          stream={remoteStream}
+          label="Peer"
+          isVideoEnabled={peerVideoEnabled}
+          onMaximize={() => setMaximizedVideo('remote')}
+        />
+      </div>
+
+      {/* Local video */}
+      <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
+        <VideoPlayer
+          stream={localStream}
+          label="You"
+          muted
+          isVideoEnabled={mediaControls.video}
+          isLocal={true}
+          enableSignLanguage={signAssistEnabled}
+          onPredictionChange={handlePredictionChange}
+          onMaximize={() => setMaximizedVideo('local')}
+        />
+        {/* Sign Assist overlay on local video */}
+        {signAssistEnabled && (
+          <MeetSignAssistPanel
+            handDetected={handDetected}
+            currentLetter={currentLetter}
+            currentPrediction={currentPrediction}
+            bufferStatus={getBufferStatus()}
+          />
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Maximize overlay */}
+      {renderMaximizedOverlay()}
+
       {/* ========= LOBBY ========= */}
       {showLobby && (
         <div className="flex-1 flex items-center justify-center p-4">
@@ -254,6 +483,13 @@ export const VideoCall = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Screen sharing indicator */}
+              {anyScreenSharing && (
+                <span className="flex items-center gap-1.5 text-xs text-gmeet-blue bg-gmeet-blue-10 px-2.5 py-1 rounded-full">
+                  <span className="w-2 h-2 rounded-full bg-gmeet-blue animate-pulse-dot" />
+                  {isScreenSharing ? 'You are presenting' : 'Peer is presenting'}
+                </span>
+              )}
               {peerConnected && (
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <span className="w-2 h-2 rounded-full bg-gmeet-green" />
@@ -271,39 +507,8 @@ export const VideoCall = () => {
 
           {/* Video Area + Chat */}
           <div className="flex-1 flex min-h-0">
-            {/* Video Grid */}
-            <div className="flex-1 p-2 flex gap-2 min-h-0 relative">
-              {/* Remote video */}
-              <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
-                <VideoPlayer
-                  videoRef={remoteVideoRef}
-                  label="Peer"
-                  isVideoEnabled={peerVideoEnabled}
-                />
-              </div>
-
-              {/* Local video */}
-              <div className="flex-1 relative rounded-lg overflow-hidden bg-surface-video">
-                <VideoPlayer
-                  stream={localStream}
-                  label="You"
-                  muted
-                  isVideoEnabled={mediaControls.video}
-                  isLocal={true}
-                  enableSignLanguage={signAssistEnabled}
-                  onPredictionChange={handlePredictionChange}
-                />
-                {/* Sign Assist overlay on local video */}
-                {signAssistEnabled && (
-                  <MeetSignAssistPanel
-                    handDetected={handDetected}
-                    currentLetter={currentLetter}
-                    currentPrediction={currentPrediction}
-                    bufferStatus={getBufferStatus()}
-                  />
-                )}
-              </div>
-            </div>
+            {/* Dynamic layout based on screen sharing */}
+            {anyScreenSharing ? renderPresentationLayout() : renderNormalLayout()}
 
             {/* Chat Panel - slide out */}
             {isChatOpen && (
@@ -336,11 +541,47 @@ export const VideoCall = () => {
                 onToggleSignAssist={toggleSignAssist}
                 onToggleChat={() => setIsChatOpen(!isChatOpen)}
                 isChatOpen={isChatOpen}
+                isScreenSharing={isScreenSharing}
+                onStartScreenShare={startScreenShare}
+                onStopScreenShare={stopScreenShare}
+                peerIsSharing={peerIsSharing}
               />
             </div>
           </div>
         </>
       )}
+
+      {/* Mic Error Toast */}
+      {micError && showCall && (
+        <div className="fixed bottom-24 left-4 z-50 animate-slide-up flex flex-col gap-2">
+          <div className="flex items-center gap-3 px-4 py-3 bg-card border border-border shadow-lg max-w-sm rounded-xl">
+            <div className="w-8 h-8 rounded-full bg-destructive-10 flex items-center justify-center flex-shrink-0">
+              <AlertCircle size={18} className="text-destructive" />
+            </div>
+            <div className="flex-1 min-w-0 pr-2">
+              <p className="text-sm font-medium text-foreground">Your mic is disabled</p>
+              <p className="text-xs text-muted-foreground truncate">Please check your permissions.</p>
+            </div>
+            <button
+              onClick={dismissMicError}
+              className="p-1.5 hover:bg-secondary rounded-lg text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              title="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+// Simple monitor icon for "You are presenting" state
+const MonitorUpIcon = () => (
+  <div className="w-20 h-20 mx-auto rounded-2xl bg-gmeet-blue-20 flex items-center justify-center">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="hsl(214, 82%, 51%)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 17V21M8 21H16M20 4H4C2.89543 4 2 4.89543 2 6V14C2 15.1046 2.89543 16 4 16H20C21.1046 16 22 15.1046 22 14V6C22 4.89543 21.1046 4 20 4Z" />
+      <path d="M12 8V12M12 8L9 11M12 8L15 11" />
+    </svg>
+  </div>
+);
